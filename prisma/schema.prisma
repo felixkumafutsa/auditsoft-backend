@@ -1,0 +1,210 @@
+// AUDITSOFT - Enterprise Auditing System
+// Comprehensive Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ USERS & ROLES ============
+
+model User {
+  id                    Int       @id @default(autoincrement())
+  name                  String
+  email                 String    @unique
+  passwordHash          String
+  status                String    @default("active") // active/inactive
+  mfaEnabled            Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  userRoles             UserRole[]
+  auditUniverseOwner    AuditUniverse[]
+  assignedAudits        Audit[] @relation("auditManager")
+  actionPlanOwner       ActionPlan[]
+  uploadedEvidence      Evidence[]
+  auditLogActivity      AuditLog[]
+}
+
+model Role {
+  id                    Int       @id @default(autoincrement())
+  roleName              String    @unique
+  description           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  userRoles             UserRole[]
+}
+
+model UserRole {
+  id                    Int       @id @default(autoincrement())
+  userId                Int
+  roleId                Int
+  assignedAt            DateTime  @default(now())
+  revokedAt             DateTime?
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role                  Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+}
+
+// ============ AUDIT UNIVERSE ============
+
+model AuditUniverse {
+  id                    Int       @id @default(autoincrement())
+  entityType            String    // Business Unit / Process / System / Vendor
+  entityName            String
+  riskRating            String    // Low / Medium / High / Critical
+  ownerId               Int
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  owner                 User      @relation(fields: [ownerId], references: [id])
+  audits                Audit[]
+}
+
+// ============ AUDITS & EXECUTION ============
+
+model Audit {
+  id                    Int       @id @default(autoincrement())
+  auditName             String
+  auditType             String    // Operational / IT / Compliance / Financial
+  status                String    @default("planned") // Planned / Approved / In Progress / Review / Finalized / Closed
+  startDate             DateTime?
+  endDate               DateTime?
+  assignedManagerId     Int?
+  auditUniverseId       Int?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  assignedManager       User?     @relation("auditManager", fields: [assignedManagerId], references: [id])
+  auditUniverse         AuditUniverse? @relation(fields: [auditUniverseId], references: [id])
+  auditPrograms         AuditProgram[]
+  findings              Finding[]
+}
+
+model AuditProgram {
+  id                    Int       @id @default(autoincrement())
+  auditId               Int
+  procedureName         String
+  controlReference      String?
+  expectedOutcome       String?
+  actualResult          String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  audit                 Audit     @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  evidence              Evidence[]
+  findings              Finding[]
+  controlMappings       ControlMapping[]
+}
+
+// ============ EVIDENCE ============
+
+model Evidence {
+  id                    Int       @id @default(autoincrement())
+  auditProgramId        Int
+  fileName              String
+  fileType              String
+  fileHash              String
+  uploadedById          Int
+  uploadedAt            DateTime  @default(now())
+  description           String?
+  status                String    @default("active") // Active / Archived
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  auditProgram          AuditProgram @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
+  uploadedBy            User      @relation(fields: [uploadedById], references: [id])
+}
+
+// ============ FINDINGS & REMEDIATION ============
+
+model Finding {
+  id                    Int       @id @default(autoincrement())
+  auditProgramId        Int?
+  auditId               Int
+  description           String
+  severity              String    // Critical / High / Medium / Low
+  rootCause             String?
+  status                String    @default("identified") // Identified / Validated / Action Assigned / Remediation In Progress / Verified / Closed
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  auditProgram          AuditProgram? @relation(fields: [auditProgramId], references: [id])
+  audit                 Audit     @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  actionPlans           ActionPlan[]
+}
+
+model ActionPlan {
+  id                    Int       @id @default(autoincrement())
+  findingId             Int
+  ownerId               Int?
+  dueDate               DateTime?
+  status                String    @default("open") // Open / In Progress / Verified / Closed
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  finding               Finding   @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  owner                 User?     @relation(fields: [ownerId], references: [id])
+}
+
+// ============ AUDIT LOGS ============
+
+model AuditLog {
+  id                    Int       @id @default(autoincrement())
+  userId                Int
+  action                String
+  entityType            String
+  entityId              Int?
+  timestamp             DateTime  @default(now())
+  ipAddress             String?
+  deviceInfo            String?
+
+  user                  User      @relation(fields: [userId], references: [id])
+}
+
+// ============ COMPLIANCE & FRAMEWORKS ============
+
+model ComplianceFramework {
+  id                    Int       @id @default(autoincrement())
+  frameworkName         String    // ISO, COSO, SOX, COBIT
+  version               String
+  description           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  controlMappings       ControlMapping[]
+}
+
+model ControlMapping {
+  id                    Int       @id @default(autoincrement())
+  auditProgramId        Int
+  frameworkId           Int
+  coverageStatus        String    // Covered / Not Covered / Partial
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  auditProgram          AuditProgram @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
+  framework             ComplianceFramework @relation(fields: [frameworkId], references: [id])
+
+  @@unique([auditProgramId, frameworkId])
+}
+
+// ============ INTEGRATIONS ============
+
+model Integration {
+  id                    Int       @id @default(autoincrement())
+  systemName            String    @unique
+  apiEndpoint           String
+  authenticationMethod  String?
+  lastSyncDate          DateTime?
+  status                String    @default("active") // active/inactive
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
