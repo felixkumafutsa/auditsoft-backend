@@ -1,6 +1,16 @@
 import { PrismaClient } from '@prisma/client';
+import { scrypt, randomBytes } from 'crypto';
+import { promisify } from 'util';
+
+const scryptAsync = promisify(scrypt);
 
 const prisma = new PrismaClient();
+
+async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString('hex');
+  const hash = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${salt}:${hash.toString('hex')}`;
+}
 
 async function main() {
   console.log(`Start seeding ...`);
@@ -56,8 +66,7 @@ async function main() {
     });
 
     if (!defaultUser) {
-      // IMPORTANT: In a real application, you should hash this password securely
-      const passwordHash = '4b3e3e29f8f4a2b2e5a6f7d8c9a0b1c2:8d9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a'; // Sample scrypt hash for "password"
+      const passwordHash = await hashPassword('password');
 
       const user = await prisma.user.create({
         data: {
@@ -71,7 +80,7 @@ async function main() {
           },
         },
       });
-      console.log(`Default user 'admin@example.com' created with password 'password' (scrypt hashed)`);
+      console.log(`Default user 'admin@example.com' created with password 'password'`);
     }
   }
 

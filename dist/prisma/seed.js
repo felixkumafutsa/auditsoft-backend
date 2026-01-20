@@ -1,7 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const client_1 = require("@prisma/client");
+const crypto_1 = require("crypto");
+const util_1 = require("util");
+const scryptAsync = (0, util_1.promisify)(crypto_1.scrypt);
 const prisma = new client_1.PrismaClient();
+async function hashPassword(password) {
+    const salt = (0, crypto_1.randomBytes)(16).toString('hex');
+    const hash = (await scryptAsync(password, salt, 64));
+    return `${salt}:${hash.toString('hex')}`;
+}
 async function main() {
     console.log(`Start seeding ...`);
     const rolesToSeed = [
@@ -49,7 +57,7 @@ async function main() {
             where: { email: 'admin@example.com' },
         });
         if (!defaultUser) {
-            const passwordHash = '4b3e3e29f8f4a2b2e5a6f7d8c9a0b1c2:8d9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a';
+            const passwordHash = await hashPassword('password');
             const user = await prisma.user.create({
                 data: {
                     name: 'Admin User',
@@ -62,7 +70,7 @@ async function main() {
                     },
                 },
             });
-            console.log(`Default user 'admin@example.com' created with password 'password' (scrypt hashed)`);
+            console.log(`Default user 'admin@example.com' created with password 'password'`);
         }
     }
     console.log(`Seeding finished.`);
