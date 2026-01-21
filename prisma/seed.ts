@@ -61,7 +61,7 @@ async function main() {
   });
 
   if (adminRole) {
-    const defaultUser = await prisma.user.findUnique({
+    let defaultUser = await prisma.user.findUnique({
       where: { email: 'admin@example.com' },
     });
 
@@ -81,6 +81,118 @@ async function main() {
         },
       });
       console.log(`Default user 'admin@example.com' created with password 'password'`);
+    }
+  }
+
+  const executiveRole = await prisma.role.findUnique({
+    where: { roleName: 'Chief Audit Executive (CAE)' },
+  });
+
+  if (executiveRole) {
+    let executiveUser = await prisma.user.findUnique({
+      where: { email: 'executive@example.com' },
+    });
+
+    if (!executiveUser) {
+      const passwordHash = await hashPassword('password');
+
+      const user = await prisma.user.create({
+        data: {
+          name: 'Executive User',
+          email: 'executive@example.com',
+          passwordHash: passwordHash,
+          userRoles: {
+            create: [{
+              roleId: executiveRole.id,
+            }],
+          },
+        },
+      });
+      console.log(`Executive user 'executive@example.com' created with password 'password'`);
+    }
+  }
+
+    const auditorRole = await prisma.role.findUnique({
+    where: { roleName: 'Auditor' },
+  });
+
+  if (auditorRole) {
+    let auditorUser = await prisma.user.findUnique({
+      where: { email: 'auditor@example.com' },
+    });
+
+    if (!auditorUser) {
+      const passwordHash = await hashPassword('password');
+
+      const user = await prisma.user.create({
+        data: {
+          name: 'Auditor User',
+          email: 'auditor@example.com',
+          passwordHash: passwordHash,
+          userRoles: {
+            create: [{
+              roleId: auditorRole.id,
+            }],
+          },
+        },
+      });
+      console.log(`Auditor user 'auditor@example.com' created with password 'password'`);
+    }
+  }
+
+      const processOwnerRole = await prisma.role.findUnique({
+    where: { roleName: 'Process Owner' },
+  });
+
+  if (processOwnerRole) {
+    let processOwnerUser = await prisma.user.findUnique({
+      where: { email: 'process@example.com' },
+    });
+
+    if (!processOwnerUser) {
+      const passwordHash = await hashPassword('password');
+
+      const user = await prisma.user.create({
+        data: {
+          name: 'Process Owner User',
+          email: 'process@example.com',
+          passwordHash: passwordHash,
+          userRoles: {
+            create: [{
+              roleId: processOwnerRole.id,
+            }],
+          },
+        },
+      });
+      console.log(`Process Owner user 'process@example.com' created with password 'password'`);
+    }
+  }
+
+  const managerRole = await prisma.role.findUnique({
+    where: { roleName: 'Audit Manager' },
+  });
+
+  if (managerRole) {
+    let managerUser = await prisma.user.findUnique({
+      where: { email: 'manager@example.com' },
+    });
+
+    if (!managerUser) {
+      const passwordHash = await hashPassword('password');
+
+      const user = await prisma.user.create({
+        data: {
+          name: 'Audit Manager User',
+          email: 'manager@example.com',
+          passwordHash: passwordHash,
+          userRoles: {
+            create: [{
+              roleId: managerRole.id,
+            }],
+          },
+        },
+      });
+      console.log(`Audit Manager user 'manager@example.com' created with password 'password'`);
     }
   }
 
