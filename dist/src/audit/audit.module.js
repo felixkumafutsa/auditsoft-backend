@@ -11,13 +11,14 @@ const common_1 = require("@nestjs/common");
 const audit_service_1 = require("./audit.service");
 const audit_controller_1 = require("./audit.controller");
 const prisma_service_1 = require("../../prisma/prisma.service");
+const audit_workflow_1 = require("../workflow/audit.workflow");
 let AuditModule = class AuditModule {
 };
 exports.AuditModule = AuditModule;
 exports.AuditModule = AuditModule = __decorate([
     (0, common_1.Module)({
         controllers: [audit_controller_1.AuditController],
-        providers: [audit_service_1.AuditService, prisma_service_1.PrismaService],
+        providers: [audit_service_1.AuditService, prisma_service_1.PrismaService, audit_workflow_1.AuditWorkflowService],
     })
 ], AuditModule);
 //# sourceMappingURL=audit.module.js.map

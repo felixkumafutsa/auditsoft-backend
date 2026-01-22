@@ -46,7 +46,7 @@ export class AuditService {
   }
 
   async create(data: CreateAuditDto): Promise<Audit> {
-    if (!data.auditName || !data.auditType) {
+    if (!data.auditName || !data.auditType)   {
       throw new BadRequestException('auditName and auditType are required');
     }
 

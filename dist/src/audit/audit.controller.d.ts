@@ -1,7 +1,9 @@
 import { AuditService, CreateAuditDto, UpdateAuditDto } from './audit.service';
+import { AuditWorkflowService } from '../workflow/audit.workflow';
 export declare class AuditController {
     private auditService;
-    constructor(auditService: AuditService);
+    private workflowService;
+    constructor(auditService: AuditService, workflowService: AuditWorkflowService);
     getAll(): Promise<{
         id: number;
         status: string;
@@ -61,5 +63,24 @@ export declare class AuditController {
         endDate: Date | null;
         assignedManagerId: number | null;
         auditUniverseId: number | null;
+    }>;
+    transitionStatus(id: number, body: {
+        toStatus: string;
+        userRole?: string;
+    }): Promise<{
+        id: number;
+        status: string;
+        createdAt: Date;
+        updatedAt: Date;
+        auditName: string;
+        auditType: string;
+        startDate: Date | null;
+        endDate: Date | null;
+        assignedManagerId: number | null;
+        auditUniverseId: number | null;
+    }>;
+    getAllowedTransitions(id: number): Promise<{
+        currentStatus: string;
+        allowedTransitions: import("../workflow/audit.workflow").AuditStatus[];
     }>;
 }

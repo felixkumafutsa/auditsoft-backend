@@ -15,10 +15,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuditController = void 0;
 const common_1 = require("@nestjs/common");
 const audit_service_1 = require("./audit.service");
+const audit_workflow_1 = require("../workflow/audit.workflow");
 let AuditController = class AuditController {
     auditService;
-    constructor(auditService) {
+    workflowService;
+    constructor(auditService, workflowService) {
         this.auditService = auditService;
+        this.workflowService = workflowService;
     }
     getAll() {
         return this.auditService.findAll();
@@ -34,6 +37,24 @@ let AuditController = class AuditController {
     }
     delete(id) {
         return this.auditService.delete(id);
+    }
+    async transitionStatus(id, body) {
+        const audit = await this.auditService.findOne(id);
+        const currentStatus = audit.status;
+        if (!this.workflowService.canTransition(currentStatus, body.toStatus)) {
+            throw new common_1.BadRequestException(`Cannot transition from ${currentStatus} to ${body.toStatus}`);
+        }
+        const permittedRoles = this.workflowService.getPermittedRoles(currentStatus, body.toStatus);
+        if (body.userRole && !permittedRoles.includes(body.userRole)) {
+            throw new common_1.BadRequestException(`Role ${body.userRole} is not permitted to transition from ${currentStatus} to ${body.toStatus}`);
+        }
+        return this.auditService.update(id, { status: body.toStatus });
+    }
+    getAllowedTransitions(id) {
+        return this.auditService.findOne(id).then(audit => ({
+            currentStatus: audit.status,
+            allowedTransitions: this.workflowService.getAllowedTransitions(audit.status),
+        }));
     }
 };
 exports.AuditController = AuditController;
@@ -72,8 +93,24 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], AuditController.prototype, "delete", null);
+__decorate([
+    (0, common_1.Post)(':id/transition'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", Promise)
+], AuditController.prototype, "transitionStatus", null);
+__decorate([
+    (0, common_1.Get)(':id/allowed-transitions'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], AuditController.prototype, "getAllowedTransitions", null);
 exports.AuditController = AuditController = __decorate([
     (0, common_1.Controller)('audits'),
-    __metadata("design:paramtypes", [audit_service_1.AuditService])
+    __metadata("design:paramtypes", [audit_service_1.AuditService,
+        audit_workflow_1.AuditWorkflowService])
 ], AuditController);
 //# sourceMappingURL=audit.controller.js.map

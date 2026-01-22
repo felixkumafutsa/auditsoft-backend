@@ -6,15 +6,21 @@ import { AuditModule } from './audit/audit.module';
 import { UserModule } from './user/user.module';
 import { RoleModule } from './role/role.module';
 import { AuthModule } from './auth/auth.module';
+import { AdminModule } from './admin.module';
+import { AuditLogModule } from './audit-log.module';
+import { FindingModule } from './finding/finding.module';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
     AuditModule,
+    FindingModule,
     UserModule,
     RoleModule,
     AuthModule,
+    AdminModule,
+    AuditLogModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
