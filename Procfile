@@ -1,1 +1,1 @@
-web: npm install --omit=dev && node dist/main
+web: npm install --omit=dev && node dist/src/main.js

@@ -1,4 +1,4 @@
 {
   "buildCommand": "",
-  "startCommand": "npm install --omit=dev && node dist/main"
+  "startCommand": "npm install --omit=dev && node dist/src/main.js"
 }
