@@ -6,9 +6,9 @@ async function bootstrap() {
 
   // Enable CORS for all origins (for demo)
   app.enableCors({
-    origin: '*',          // allow all domains
+    origin: '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: false
+    credentials: false,
   });
 
   await app.listen(process.env.PORT || 5000);
