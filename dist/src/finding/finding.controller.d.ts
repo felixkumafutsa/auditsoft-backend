@@ -10,9 +10,9 @@ export declare class FindingController {
         createdAt: Date;
         updatedAt: Date;
         description: string;
+        auditProgramId: number | null;
         auditId: number;
         severity: string;
-        auditProgramId: number | null;
         rootCause: string | null;
     }[]>;
     getCritical(): Promise<{
@@ -21,9 +21,9 @@ export declare class FindingController {
         createdAt: Date;
         updatedAt: Date;
         description: string;
+        auditProgramId: number | null;
         auditId: number;
         severity: string;
-        auditProgramId: number | null;
         rootCause: string | null;
     }[]>;
     getOverdue(): Promise<{
@@ -32,9 +32,9 @@ export declare class FindingController {
         createdAt: Date;
         updatedAt: Date;
         description: string;
+        auditProgramId: number | null;
         auditId: number;
         severity: string;
-        auditProgramId: number | null;
         rootCause: string | null;
     }[]>;
     getOne(id: number): Promise<{
@@ -43,9 +43,9 @@ export declare class FindingController {
         createdAt: Date;
         updatedAt: Date;
         description: string;
+        auditProgramId: number | null;
         auditId: number;
         severity: string;
-        auditProgramId: number | null;
         rootCause: string | null;
     }>;
     getByAudit(auditId: number): Promise<{
@@ -54,9 +54,9 @@ export declare class FindingController {
         createdAt: Date;
         updatedAt: Date;
         description: string;
+        auditProgramId: number | null;
         auditId: number;
         severity: string;
-        auditProgramId: number | null;
         rootCause: string | null;
     }[]>;
     create(body: CreateFindingDto): Promise<{
@@ -65,9 +65,9 @@ export declare class FindingController {
         createdAt: Date;
         updatedAt: Date;
         description: string;
+        auditProgramId: number | null;
         auditId: number;
         severity: string;
-        auditProgramId: number | null;
         rootCause: string | null;
     }>;
     update(id: number, body: UpdateFindingDto): Promise<{
@@ -76,9 +76,9 @@ export declare class FindingController {
         createdAt: Date;
         updatedAt: Date;
         description: string;
+        auditProgramId: number | null;
         auditId: number;
         severity: string;
-        auditProgramId: number | null;
         rootCause: string | null;
     }>;
     delete(id: number): Promise<{
@@ -87,9 +87,9 @@ export declare class FindingController {
         createdAt: Date;
         updatedAt: Date;
         description: string;
+        auditProgramId: number | null;
         auditId: number;
         severity: string;
-        auditProgramId: number | null;
         rootCause: string | null;
     }>;
     transitionStatus(id: number, body: {
@@ -101,9 +101,9 @@ export declare class FindingController {
         createdAt: Date;
         updatedAt: Date;
         description: string;
+        auditProgramId: number | null;
         auditId: number;
         severity: string;
-        auditProgramId: number | null;
         rootCause: string | null;
     }>;
     getAllowedTransitions(id: number): Promise<{

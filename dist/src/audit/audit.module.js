@@ -10,15 +10,30 @@ exports.AuditModule = void 0;
 const common_1 = require("@nestjs/common");
 const audit_service_1 = require("./audit.service");
 const audit_controller_1 = require("./audit.controller");
+const audit_workflow_controller_1 = require("./audit-workflow.controller");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const audit_workflow_1 = require("../workflow/audit.workflow");
+const audit_timeline_service_1 = require("./audit-timeline.service");
+const audit_risk_service_1 = require("./audit-risk.service");
+const audit_approval_service_1 = require("./audit-approval.service");
+const audit_comments_service_1 = require("./audit-comments.service");
+const bulk_audit_service_1 = require("./bulk-audit.service");
 let AuditModule = class AuditModule {
 };
 exports.AuditModule = AuditModule;
 exports.AuditModule = AuditModule = __decorate([
     (0, common_1.Module)({
-        controllers: [audit_controller_1.AuditController],
-        providers: [audit_service_1.AuditService, prisma_service_1.PrismaService, audit_workflow_1.AuditWorkflowService],
+        controllers: [audit_controller_1.AuditController, audit_workflow_controller_1.AuditWorkflowController],
+        providers: [
+            audit_service_1.AuditService,
+            prisma_service_1.PrismaService,
+            audit_workflow_1.AuditWorkflowService,
+            audit_timeline_service_1.AuditTimelineService,
+            audit_risk_service_1.AuditRiskService,
+            audit_approval_service_1.AuditApprovalService,
+            audit_comments_service_1.AuditCommentsService,
+            bulk_audit_service_1.BulkAuditService,
+        ],
     })
 ], AuditModule);
 //# sourceMappingURL=audit.module.js.map
