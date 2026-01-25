@@ -45,7 +45,7 @@ let AuditWorkflowService = class AuditWorkflowService {
     getPermittedRoles(fromStatus, toStatus) {
         const transitions = {
             [AuditStatus.PLANNED]: {
-                [AuditStatus.APPROVED]: ['CAE', 'Admin'],
+                [AuditStatus.APPROVED]: ['CAE'],
                 [AuditStatus.CLOSED]: ['Admin'],
             },
             [AuditStatus.APPROVED]: {

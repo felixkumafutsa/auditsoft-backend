@@ -86,6 +86,7 @@ model Audit {
   auditUniverse         AuditUniverse? @relation(fields: [auditUniverseId], references: [id])
   auditPrograms         AuditProgram[]
   findings              Finding[]
+  risks                 Risk[]    @relation("AuditRisks")
 }
 
 model AuditProgram {
@@ -144,6 +145,7 @@ model Finding {
 model ActionPlan {
   id                    Int       @id @default(autoincrement())
   findingId             Int
+  description           String
   ownerId               Int?
   dueDate               DateTime?
   status                String    @default("open") // Open / In Progress / Verified / Closed

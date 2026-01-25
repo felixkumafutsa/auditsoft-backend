@@ -38,6 +38,14 @@ let AuditController = class AuditController {
     delete(id) {
         return this.auditService.delete(id);
     }
+    async getPrograms(id) {
+        const audit = await this.auditService.findOne(id);
+        return audit.auditPrograms || [];
+    }
+    async getFindings(id) {
+        const audit = await this.auditService.findOne(id);
+        return audit.findings || [];
+    }
     async transitionStatus(id, body) {
         const audit = await this.auditService.findOne(id);
         const currentStatus = audit.status;
@@ -93,6 +101,20 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], AuditController.prototype, "delete", null);
+__decorate([
+    (0, common_1.Get)(':id/programs'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", Promise)
+], AuditController.prototype, "getPrograms", null);
+__decorate([
+    (0, common_1.Get)(':id/findings'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", Promise)
+], AuditController.prototype, "getFindings", null);
 __decorate([
     (0, common_1.Post)(':id/transition'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),

@@ -1,5 +1,19 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, BadRequestException } from '@nestjs/common';
-import { FindingService, CreateFindingDto, UpdateFindingDto } from './finding.service';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  ParseIntPipe,
+  BadRequestException,
+} from '@nestjs/common';
+import {
+  FindingService,
+  CreateFindingDto,
+  UpdateFindingDto,
+} from './finding.service';
 import { FindingWorkflowService } from '../workflow/finding.workflow';
 
 @Controller('findings')
@@ -27,6 +41,14 @@ export class FindingController {
   @Get(':id')
   getOne(@Param('id', ParseIntPipe) id: number) {
     return this.findingService.findOne(id);
+  }
+
+  @Get(':id/action-plans')
+  async getActionPlans(@Param('id', ParseIntPipe) id: number) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const finding: any = await this.findingService.findOne(id);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return
+    return finding.actionPlans || [];
   }
 
   @Get('audit/:auditId')
@@ -57,29 +79,35 @@ export class FindingController {
   @Post(':id/transition')
   async transitionStatus(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { toStatus: string; userRole?: string }
+    @Body() body: { toStatus: string; userRole?: string },
   ) {
-    return this.findingService.transitionStatus(id, body.toStatus, body.userRole);
+    return this.findingService.transitionStatus(
+      id,
+      body.toStatus,
+      body.userRole,
+    );
   }
 
   @Get(':id/allowed-transitions')
   getAllowedTransitions(@Param('id', ParseIntPipe) id: number) {
-    return this.findingService.findOne(id).then(finding => ({
+    return this.findingService.findOne(id).then((finding) => ({
       currentStatus: finding.status,
-      allowedTransitions: this.workflowService.getAllowedTransitions(finding.status),
+      allowedTransitions: this.workflowService.getAllowedTransitions(
+        finding.status,
+      ),
     }));
   }
 
   @Post(':id/escalate')
   async escalate(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { reason: string; escalatedTo: string }
+    @Body() body: { reason: string; escalatedTo: string },
   ) {
     const finding = await this.findingService.findOne(id);
-    
+
     if (!this.workflowService.requiresEscalation(finding.severity)) {
       throw new BadRequestException(
-        `Finding with severity ${finding.severity} does not require escalation`
+        `Finding with severity ${finding.severity} does not require escalation`,
       );
     }
 

@@ -38,14 +38,14 @@ let AuditService = class AuditService {
     }
     async findAll() {
         return this.prisma.audit.findMany({
-            include: { findings: true, auditPrograms: true },
+            include: { findings: true, auditPrograms: true, assignedManager: true },
             orderBy: { createdAt: 'desc' }
         });
     }
     async findOne(id) {
         const audit = await this.prisma.audit.findUnique({
             where: { id },
-            include: { findings: true, auditPrograms: true },
+            include: { findings: true, auditPrograms: true, assignedManager: true },
         });
         if (!audit) {
             throw new common_1.NotFoundException(`Audit with ID ${id} not found`);

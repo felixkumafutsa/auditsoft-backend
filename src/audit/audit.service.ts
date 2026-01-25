@@ -27,7 +27,7 @@ export class AuditService {
 
   async findAll(): Promise<Audit[]> {
     return this.prisma.audit.findMany({ 
-      include: { findings: true, auditPrograms: true },
+      include: { findings: true, auditPrograms: true, assignedManager: true },
       orderBy: { createdAt: 'desc' }
     });
   }
@@ -35,7 +35,7 @@ export class AuditService {
   async findOne(id: number): Promise<Audit> {
     const audit = await this.prisma.audit.findUnique({
       where: { id },
-      include: { findings: true, auditPrograms: true },
+      include: { findings: true, auditPrograms: true, assignedManager: true },
     });
     
     if (!audit) {
@@ -46,7 +46,7 @@ export class AuditService {
   }
 
   async create(data: CreateAuditDto): Promise<Audit> {
-    if (!data.auditName || !data.auditType)   {
+    if (!data.auditName || !data.auditType) {
       throw new BadRequestException('auditName and auditType are required');
     }
 

@@ -55,7 +55,7 @@ export class AuditWorkflowService {
   getPermittedRoles(fromStatus: string, toStatus: string): string[] {
     const transitions: Record<string, Record<string, string[]>> = {
       [AuditStatus.PLANNED]: {
-        [AuditStatus.APPROVED]: ['CAE', 'Admin'],
+        [AuditStatus.APPROVED]: ['CAE'],
         [AuditStatus.CLOSED]: ['Admin'],
       },
       [AuditStatus.APPROVED]: {

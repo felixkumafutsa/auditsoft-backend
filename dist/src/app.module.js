@@ -18,6 +18,9 @@ const auth_module_1 = require("./auth/auth.module");
 const admin_module_1 = require("./admin.module");
 const audit_log_module_1 = require("./audit-log.module");
 const finding_module_1 = require("./finding/finding.module");
+const audit_program_module_1 = require("./audit-program/audit-program.module");
+const action_plan_module_1 = require("./action-plan/action-plan.module");
+const evidence_module_1 = require("./evidence/evidence.module");
 const prisma_service_1 = require("../prisma/prisma.service");
 let AppModule = class AppModule {
 };
@@ -27,7 +30,10 @@ exports.AppModule = AppModule = __decorate([
         imports: [
             config_1.ConfigModule.forRoot(),
             audit_module_1.AuditModule,
+            audit_program_module_1.AuditProgramModule,
+            evidence_module_1.EvidenceModule,
             finding_module_1.FindingModule,
+            action_plan_module_1.ActionPlanModule,
             user_module_1.UserModule,
             role_module_1.RoleModule,
             auth_module_1.AuthModule,

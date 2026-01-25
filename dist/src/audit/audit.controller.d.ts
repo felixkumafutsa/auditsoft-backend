@@ -64,6 +64,8 @@ export declare class AuditController {
         assignedManagerId: number | null;
         auditUniverseId: number | null;
     }>;
+    getPrograms(id: number): Promise<any>;
+    getFindings(id: number): Promise<any>;
     transitionStatus(id: number, body: {
         toStatus: string;
         userRole?: string;

@@ -35,6 +35,10 @@ let FindingController = class FindingController {
     getOne(id) {
         return this.findingService.findOne(id);
     }
+    async getActionPlans(id) {
+        const finding = await this.findingService.findOne(id);
+        return finding.actionPlans || [];
+    }
     getByAudit(auditId) {
         return this.findingService.findByAudit(auditId);
     }
@@ -51,7 +55,7 @@ let FindingController = class FindingController {
         return this.findingService.transitionStatus(id, body.toStatus, body.userRole);
     }
     getAllowedTransitions(id) {
-        return this.findingService.findOne(id).then(finding => ({
+        return this.findingService.findOne(id).then((finding) => ({
             currentStatus: finding.status,
             allowedTransitions: this.workflowService.getAllowedTransitions(finding.status),
         }));
@@ -96,6 +100,13 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], FindingController.prototype, "getOne", null);
+__decorate([
+    (0, common_1.Get)(':id/action-plans'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", Promise)
+], FindingController.prototype, "getActionPlans", null);
 __decorate([
     (0, common_1.Get)('audit/:auditId'),
     __param(0, (0, common_1.Param)('auditId', common_1.ParseIntPipe)),

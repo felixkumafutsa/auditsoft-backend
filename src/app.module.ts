@@ -9,13 +9,19 @@ import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin.module';
 import { AuditLogModule } from './audit-log.module';
 import { FindingModule } from './finding/finding.module';
+import { AuditProgramModule } from './audit-program/audit-program.module';
+import { ActionPlanModule } from './action-plan/action-plan.module';
+import { EvidenceModule } from './evidence/evidence.module';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
     AuditModule,
+    AuditProgramModule,
+    EvidenceModule,
     FindingModule,
+    ActionPlanModule,
     UserModule,
     RoleModule,
     AuthModule,

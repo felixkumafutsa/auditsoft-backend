@@ -1,1 +1,1 @@
-web: npm install --omit=dev && node dist/src/main.js
+web: npm run start:prod

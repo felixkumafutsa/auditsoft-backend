@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, BadRequestException } from '@nestjs/common';
+import { 
+  Controller, 
+  Get, 
+  Post, 
+  Put, 
+  Delete, 
+  Body, 
+  Param, 
+  ParseIntPipe, 
+  BadRequestException 
+} from '@nestjs/common';
 import { AuditService, CreateAuditDto, UpdateAuditDto } from './audit.service';
 import { AuditWorkflowService } from '../workflow/audit.workflow';
 
@@ -35,6 +45,18 @@ export class AuditController {
   @Delete(':id')
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.auditService.delete(id);
+  }
+
+  @Get(':id/programs')
+  async getPrograms(@Param('id', ParseIntPipe) id: number) {
+    const audit = await this.auditService.findOne(id);
+    return (audit as any).auditPrograms || [];
+  }
+
+  @Get(':id/findings')
+  async getFindings(@Param('id', ParseIntPipe) id: number) {
+    const audit = await this.auditService.findOne(id);
+    return (audit as any).findings || [];
   }
 
   // ========== WORKFLOW STATE TRANSITIONS ==========
