@@ -12,6 +12,12 @@ async function bootstrap() {
   });
 
   app.setGlobalPrefix('api');
-  await app.listen(process.env.PORT || 5000);
+  
+  const port = process.env.PORT || 5000;
+  await app.listen(port);
+  console.log(`Application is running on: ${await app.getUrl()}`);
 }
-bootstrap();
+bootstrap().catch(err => {
+  console.error('Fatal Error during bootstrap:', err);
+  process.exit(1);
+});
