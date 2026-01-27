@@ -4,13 +4,9 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS for all origins (for demo)
+  // Enable CORS for all origins (for debugging)
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'https://mw265.com',
-      'https://www.mw265.com',
-    ],
+    origin: true, // Allow all origins dynamically
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
