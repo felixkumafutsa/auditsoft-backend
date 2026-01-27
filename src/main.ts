@@ -13,6 +13,15 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   
+  // Debug: Log Database URL (masked)
+  const dbUrl = process.env.DATABASE_URL;
+  if (dbUrl) {
+    const maskedUrl = dbUrl.replace(/:([^:@]+)@/, ':****@');
+    console.log(`[Bootstrap] Using DATABASE_URL: ${maskedUrl}`);
+  } else {
+    console.error('[Bootstrap] CRITICAL: DATABASE_URL is not defined!');
+  }
+
   const port = process.env.PORT || 5000;
   await app.listen(port);
   console.log(`Application is running on: ${await app.getUrl()}`);
