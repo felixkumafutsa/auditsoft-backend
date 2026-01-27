@@ -22,7 +22,7 @@ async function bootstrap() {
     console.error('[Bootstrap] CRITICAL: DATABASE_URL is not defined!');
   }
 
-  const port = process.env.PORT || 5000;
+  const port = process.env.PORT || 3002;
   await app.listen(port);
   console.log(`Application is running on: ${await app.getUrl()}`);
 }
