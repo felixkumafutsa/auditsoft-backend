@@ -28,6 +28,7 @@ model User {
   actionPlanOwner       ActionPlan[]
   uploadedEvidence      Evidence[]
   auditLogActivity      AuditLog[]
+  risksOwned            Risk[]    @relation("RiskOwner")
 }
 
 model Role {
@@ -209,4 +210,23 @@ model Integration {
   status                String    @default("active") // active/inactive
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+}
+
+// ============ RISK MANAGEMENT ============
+
+model Risk {
+  id          Int      @id @default(autoincrement())
+  riskId      String   @unique // e.g., RISK-001
+  title       String
+  description String?
+  category    String   // Operational, Financial, Compliance, IT
+  impact      String   // Low, Medium, High, Critical
+  likelihood  String   // Low, Medium, High
+  status      String   @default("open") // Open, Mitigated, Accepted
+  ownerId     Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User?    @relation("RiskOwner", fields: [ownerId], references: [id])
+  audits      Audit[]  @relation("AuditRisks")
 }

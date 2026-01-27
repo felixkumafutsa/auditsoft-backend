@@ -6,11 +6,12 @@ async function bootstrap() {
 
   // Enable CORS for all origins (for demo)
   app.enableCors({
-    origin: '*',
+    origin: ['http://localhost:3000', 'https://mw265.com'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: false,
+    credentials: true,
   });
 
+  app.setGlobalPrefix('api');
   await app.listen(process.env.PORT || 5000);
 }
 bootstrap();

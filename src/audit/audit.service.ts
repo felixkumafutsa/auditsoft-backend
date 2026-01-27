@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Audit } from '@prisma/client';
 
@@ -37,11 +41,11 @@ export class AuditService {
       where: { id },
       include: { findings: true, auditPrograms: true, assignedManager: true },
     });
-    
+
     if (!audit) {
       throw new NotFoundException(`Audit with ID ${id} not found`);
     }
-    
+
     return audit;
   }
 
@@ -50,7 +54,7 @@ export class AuditService {
       throw new BadRequestException('auditName and auditType are required');
     }
 
-    return this.prisma.audit.create({ 
+    return this.prisma.audit.create({
       data: {
         auditName: data.auditName,
         auditType: data.auditType,
@@ -66,7 +70,7 @@ export class AuditService {
 
   async update(id: number, data: UpdateAuditDto): Promise<Audit> {
     const audit = await this.findOne(id);
-    
+
     return this.prisma.audit.update({
       where: { id },
       data: {
@@ -75,14 +79,16 @@ export class AuditService {
         ...(data.status && { status: data.status }),
         ...(data.startDate && { startDate: data.startDate }),
         ...(data.endDate && { endDate: data.endDate }),
-        ...(data.assignedManagerId !== undefined && { assignedManagerId: data.assignedManagerId }),
+        ...(data.assignedManagerId !== undefined && {
+          assignedManagerId: data.assignedManagerId,
+        }),
       },
       include: { findings: true, auditPrograms: true },
     });
   }
 
   async delete(id: number): Promise<Audit> {
-    const audit = await this.findOne(id);
+    await this.findOne(id);
 
     return this.prisma.audit.delete({
       where: { id },
@@ -90,4 +96,3 @@ export class AuditService {
     });
   }
 }
-

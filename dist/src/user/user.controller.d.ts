@@ -2,16 +2,7 @@ import { UserService, CreateUserDto, UpdateUserDto } from './user.service';
 export declare class UserController {
     private userService;
     constructor(userService: UserService);
-    getAll(): Promise<Omit<{
-        name: string;
-        id: number;
-        email: string;
-        passwordHash: string;
-        status: string;
-        mfaEnabled: boolean;
-        createdAt: Date;
-        updatedAt: Date;
-    }, "passwordHash">[]>;
+    getAll(): Promise<any[]>;
     getOne(id: number): Promise<Omit<{
         name: string;
         id: number;

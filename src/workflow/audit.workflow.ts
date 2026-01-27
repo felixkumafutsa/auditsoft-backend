@@ -55,23 +55,23 @@ export class AuditWorkflowService {
   getPermittedRoles(fromStatus: string, toStatus: string): string[] {
     const transitions: Record<string, Record<string, string[]>> = {
       [AuditStatus.PLANNED]: {
-        [AuditStatus.APPROVED]: ['CAE'],
-        [AuditStatus.CLOSED]: ['Admin'],
+        [AuditStatus.APPROVED]: ['Chief Audit Executive (CAE)'],
+        [AuditStatus.CLOSED]: ['System Administrator'],
       },
       [AuditStatus.APPROVED]: {
-        [AuditStatus.IN_PROGRESS]: ['Manager', 'CAE'],
-        [AuditStatus.CLOSED]: ['Admin'],
+        [AuditStatus.IN_PROGRESS]: ['Audit Manager', 'Chief Audit Executive (CAE)'],
+        [AuditStatus.CLOSED]: ['System Administrator'],
       },
       [AuditStatus.IN_PROGRESS]: {
-        [AuditStatus.UNDER_REVIEW]: ['Manager', 'Auditor'],
-        [AuditStatus.CLOSED]: ['Admin'],
+        [AuditStatus.UNDER_REVIEW]: ['Audit Manager', 'Auditor'],
+        [AuditStatus.CLOSED]: ['System Administrator'],
       },
       [AuditStatus.UNDER_REVIEW]: {
-        [AuditStatus.FINALIZED]: ['Manager', 'CAE'],
-        [AuditStatus.IN_PROGRESS]: ['Manager'],
+        [AuditStatus.FINALIZED]: ['Audit Manager', 'Chief Audit Executive (CAE)'],
+        [AuditStatus.IN_PROGRESS]: ['Audit Manager'],
       },
       [AuditStatus.FINALIZED]: {
-        [AuditStatus.CLOSED]: ['CAE', 'Admin'],
+        [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'System Administrator'],
       },
     };
 

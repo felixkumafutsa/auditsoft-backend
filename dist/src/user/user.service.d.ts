@@ -19,7 +19,7 @@ export declare class UserService {
     constructor(prisma: PrismaService);
     private hashPassword;
     validatePassword(password: string, hash: string): Promise<boolean>;
-    findAll(): Promise<Omit<User, 'passwordHash'>[]>;
+    findAll(): Promise<any[]>;
     findOne(id: number): Promise<Omit<User, 'passwordHash'>>;
     findByEmail(email: string): Promise<User | null>;
     create(data: CreateUserDto): Promise<Omit<User, 'passwordHash'>>;

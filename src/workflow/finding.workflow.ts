@@ -61,23 +61,23 @@ export class FindingWorkflowService {
   getPermittedRoles(fromStatus: string, toStatus: string): string[] {
     const transitions: Record<string, Record<string, string[]>> = {
       [FindingStatus.IDENTIFIED]: {
-        [FindingStatus.VALIDATED]: ['Auditor', 'Manager'],
-        [FindingStatus.CLOSED]: ['Admin'],
+        [FindingStatus.VALIDATED]: ['Auditor', 'Audit Manager'],
+        [FindingStatus.CLOSED]: ['System Administrator'],
       },
       [FindingStatus.VALIDATED]: {
-        [FindingStatus.ACTION_ASSIGNED]: ['Manager', 'CAE'],
-        [FindingStatus.CLOSED]: ['Admin'],
+        [FindingStatus.ACTION_ASSIGNED]: ['Audit Manager', 'Chief Audit Executive (CAE)'],
+        [FindingStatus.CLOSED]: ['System Administrator'],
       },
       [FindingStatus.ACTION_ASSIGNED]: {
-        [FindingStatus.REMEDIATION_IN_PROGRESS]: ['ProcessOwner', 'Manager'],
-        [FindingStatus.CLOSED]: ['Admin'],
+        [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Process Owner', 'Audit Manager'],
+        [FindingStatus.CLOSED]: ['System Administrator'],
       },
       [FindingStatus.REMEDIATION_IN_PROGRESS]: {
-        [FindingStatus.VERIFIED]: ['Auditor', 'Manager'],
-        [FindingStatus.ACTION_ASSIGNED]: ['Manager'],
+        [FindingStatus.VERIFIED]: ['Auditor', 'Audit Manager'],
+        [FindingStatus.ACTION_ASSIGNED]: ['Audit Manager'],
       },
       [FindingStatus.VERIFIED]: {
-        [FindingStatus.CLOSED]: ['Manager', 'CAE'],
+        [FindingStatus.CLOSED]: ['Audit Manager', 'Chief Audit Executive (CAE)'],
       },
     };
 

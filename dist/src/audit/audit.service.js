@@ -79,13 +79,15 @@ let AuditService = class AuditService {
                 ...(data.status && { status: data.status }),
                 ...(data.startDate && { startDate: data.startDate }),
                 ...(data.endDate && { endDate: data.endDate }),
-                ...(data.assignedManagerId !== undefined && { assignedManagerId: data.assignedManagerId }),
+                ...(data.assignedManagerId !== undefined && {
+                    assignedManagerId: data.assignedManagerId,
+                }),
             },
             include: { findings: true, auditPrograms: true },
         });
     }
     async delete(id) {
-        const audit = await this.findOne(id);
+        await this.findOne(id);
         return this.prisma.audit.delete({
             where: { id },
             include: { findings: true, auditPrograms: true },

@@ -38,7 +38,7 @@ export class UserService {
     return newHash.toString('hex') === storedHash;
   }
 
-  async findAll(): Promise<Omit<User, 'passwordHash'>[]> {
+  async findAll(): Promise<any[]> {
     return this.prisma.user.findMany({
       select: {
         id: true,

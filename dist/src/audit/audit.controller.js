@@ -59,7 +59,7 @@ let AuditController = class AuditController {
         return this.auditService.update(id, { status: body.toStatus });
     }
     getAllowedTransitions(id) {
-        return this.auditService.findOne(id).then(audit => ({
+        return this.auditService.findOne(id).then((audit) => ({
             currentStatus: audit.status,
             allowedTransitions: this.workflowService.getAllowedTransitions(audit.status),
         }));

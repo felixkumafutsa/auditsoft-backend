@@ -1,13 +1,13 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Put, 
-  Delete, 
-  Body, 
-  Param, 
-  ParseIntPipe, 
-  BadRequestException 
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuditService, CreateAuditDto, UpdateAuditDto } from './audit.service';
 import { AuditWorkflowService } from '../workflow/audit.workflow';
@@ -35,10 +35,7 @@ export class AuditController {
   }
 
   @Put(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: UpdateAuditDto,
-  ) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateAuditDto) {
     return this.auditService.update(id, body);
   }
 
@@ -50,12 +47,14 @@ export class AuditController {
   @Get(':id/programs')
   async getPrograms(@Param('id', ParseIntPipe) id: number) {
     const audit = await this.auditService.findOne(id);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return
     return (audit as any).auditPrograms || [];
   }
 
   @Get(':id/findings')
   async getFindings(@Param('id', ParseIntPipe) id: number) {
     const audit = await this.auditService.findOne(id);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return
     return (audit as any).findings || [];
   }
 
@@ -64,7 +63,7 @@ export class AuditController {
   @Post(':id/transition')
   async transitionStatus(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { toStatus: string; userRole?: string }
+    @Body() body: { toStatus: string; userRole?: string },
   ) {
     const audit = await this.auditService.findOne(id);
     const currentStatus = audit.status;
@@ -72,15 +71,18 @@ export class AuditController {
     // Validate transition
     if (!this.workflowService.canTransition(currentStatus, body.toStatus)) {
       throw new BadRequestException(
-        `Cannot transition from ${currentStatus} to ${body.toStatus}`
+        `Cannot transition from ${currentStatus} to ${body.toStatus}`,
       );
     }
 
     // Check role permissions
-    const permittedRoles = this.workflowService.getPermittedRoles(currentStatus, body.toStatus);
+    const permittedRoles = this.workflowService.getPermittedRoles(
+      currentStatus,
+      body.toStatus,
+    );
     if (body.userRole && !permittedRoles.includes(body.userRole)) {
       throw new BadRequestException(
-        `Role ${body.userRole} is not permitted to transition from ${currentStatus} to ${body.toStatus}`
+        `Role ${body.userRole} is not permitted to transition from ${currentStatus} to ${body.toStatus}`,
       );
     }
 
@@ -89,9 +91,11 @@ export class AuditController {
 
   @Get(':id/allowed-transitions')
   getAllowedTransitions(@Param('id', ParseIntPipe) id: number) {
-    return this.auditService.findOne(id).then(audit => ({
+    return this.auditService.findOne(id).then((audit) => ({
       currentStatus: audit.status,
-      allowedTransitions: this.workflowService.getAllowedTransitions(audit.status),
+      allowedTransitions: this.workflowService.getAllowedTransitions(
+        audit.status,
+      ),
     }));
   }
 }
