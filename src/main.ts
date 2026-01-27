@@ -6,7 +6,11 @@ async function bootstrap() {
 
   // Enable CORS for all origins (for demo)
   app.enableCors({
-    origin: ['http://localhost:3000', 'https://mw265.com'],
+    origin: [
+      'http://localhost:3000',
+      'https://mw265.com',
+      'https://www.mw265.com',
+    ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
