@@ -3,8 +3,12 @@ dotenv.config(); // Load .env file before anything else
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import * as dotenv from 'dotenv';
 
 async function bootstrap() {
+  // Explicitly load .env file
+  dotenv.config();
+
   const app = await NestFactory.create(AppModule);
 
   // Enable CORS for all origins (for debugging)
