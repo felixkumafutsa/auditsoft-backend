@@ -5,11 +5,11 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Enable CORS for all origins (for debugging)
-  app.enableCors({
-    origin: true, // Allow all origins dynamically
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: true,
-  });
+app.enableCors({
+  origin: ['https://mw265.com', 'http://localhost:3001'], // Add your actual domain
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  credentials: true,
+});
 
   app.setGlobalPrefix('api');
   

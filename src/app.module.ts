@@ -12,6 +12,7 @@ import { FindingModule } from './finding/finding.module';
 import { AuditProgramModule } from './audit-program/audit-program.module';
 import { ActionPlanModule } from './action-plan/action-plan.module';
 import { EvidenceModule } from './evidence/evidence.module';
+import { NotificationModule } from './notification/notification.module';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
@@ -27,6 +28,7 @@ import { PrismaService } from '../prisma/prisma.service';
     AuthModule,
     AdminModule,
     AuditLogModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

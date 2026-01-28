@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationService } from '../notification/notification.service';
 
 export class ApprovalRequestDto {
   auditId: number;
@@ -21,7 +22,10 @@ export class SubmitApprovalDto {
 
 @Injectable()
 export class AuditApprovalService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationService: NotificationService,
+  ) {}
 
   // Store approvals in memory for this session
   private approvals: Map<number, any[]> = new Map();
@@ -54,6 +58,17 @@ export class AuditApprovalService {
     }
 
     this.approvals.get(data.auditId)!.push(approval);
+
+    // Notify approver
+    if (data.approverUserId) {
+      await this.notificationService.create({
+        userId: data.approverUserId,
+        title: 'Approval Request',
+        message: `You have a pending approval request for Audit ID ${data.auditId}`,
+        type: 'action_required',
+        link: `/audits/${data.auditId}/approval`
+      });
+    }
 
     return approval;
   }

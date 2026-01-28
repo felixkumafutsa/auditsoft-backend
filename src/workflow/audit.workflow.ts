@@ -1,5 +1,7 @@
 // src/workflow/audit.workflow.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { NotificationService } from '../notification/notification.service';
+import { CreateNotificationDto } from '../notification/dto/create-notification.dto';
 
 export enum AuditStatus {
   PLANNED = 'Planned',
@@ -12,6 +14,8 @@ export enum AuditStatus {
 
 @Injectable()
 export class AuditWorkflowService {
+  constructor(private notificationService: NotificationService) {}
+
   // Define valid state transitions
   private readonly validTransitions: Record<AuditStatus, AuditStatus[]> = {
     [AuditStatus.PLANNED]: [AuditStatus.APPROVED, AuditStatus.CLOSED],
@@ -39,6 +43,65 @@ export class AuditWorkflowService {
 
     const allowedTransitions = this.validTransitions[from] || [];
     return allowedTransitions.includes(to);
+  }
+
+  /**
+   * Handle state transition and trigger notifications
+   */
+  async handleTransition(auditId: number, auditName: string, fromStatus: string, toStatus: string, managerId?: number) {
+    if (!this.canTransition(fromStatus, toStatus)) {
+      throw new BadRequestException(`Invalid transition from ${fromStatus} to ${toStatus}`);
+    }
+
+    // Trigger Notification based on new status
+    await this.triggerNotification(auditId, auditName, toStatus, managerId);
+  }
+
+  private async triggerNotification(auditId: number, auditName: string, status: string, managerId?: number) {
+    let title = '';
+    let message = '';
+    let type = 'info';
+    let targetUserId = managerId; 
+
+    // Logic to determine notification content and recipient
+    switch (status) {
+      case AuditStatus.APPROVED:
+        title = 'Audit Approved';
+        message = `The audit "${auditName}" has been approved and is ready to start.`;
+        type = 'success';
+        break;
+      case AuditStatus.IN_PROGRESS:
+        title = 'Audit Started';
+        message = `The audit "${auditName}" is now in progress.`;
+        type = 'info';
+        break;
+      case AuditStatus.UNDER_REVIEW:
+        title = 'Audit Review Needed';
+        message = `The audit "${auditName}" is ready for review.`;
+        type = 'action_required';
+        break;
+      case AuditStatus.FINALIZED:
+        title = 'Audit Finalized';
+        message = `The audit "${auditName}" has been finalized.`;
+        type = 'success';
+        break;
+      case AuditStatus.CLOSED:
+        title = 'Audit Closed';
+        message = `The audit "${auditName}" has been closed.`;
+        type = 'warning';
+        break;
+    }
+
+    if (title && targetUserId) {
+      const notification: CreateNotificationDto = {
+        userId: targetUserId,
+        title,
+        message,
+        type,
+        link: `/audits/${auditId}`,
+      };
+      await this.notificationService.create(notification);
+    }
   }
 
   /**

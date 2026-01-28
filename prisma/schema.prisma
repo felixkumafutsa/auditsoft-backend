@@ -30,6 +30,7 @@ model User {
   uploadedEvidence      Evidence[]
   auditLogActivity      AuditLog[]
   risksOwned            Risk[]    @relation("RiskOwner")
+  notifications         Notification[]
 }
 
 model Role {
@@ -230,4 +231,20 @@ model Risk {
 
   owner       User?    @relation("RiskOwner", fields: [ownerId], references: [id])
   audits      Audit[]  @relation("AuditRisks")
+}
+
+// ============ NOTIFICATIONS ============
+
+model Notification {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  title       String
+  message     String
+  type        String   // info, warning, success, error, action_required
+  link        String?  // URL to redirect when clicked
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

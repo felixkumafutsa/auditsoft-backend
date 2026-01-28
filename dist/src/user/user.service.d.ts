@@ -21,7 +21,7 @@ export declare class UserService {
     validatePassword(password: string, hash: string): Promise<boolean>;
     findAll(): Promise<any[]>;
     findOne(id: number): Promise<Omit<User, 'passwordHash'>>;
-    findByEmail(email: string): Promise<User | null>;
+    findByEmail(email: string): Promise<any>;
     create(data: CreateUserDto): Promise<Omit<User, 'passwordHash'>>;
     update(id: number, data: UpdateUserDto): Promise<Omit<User, 'passwordHash'>>;
     delete(id: number): Promise<Omit<User, 'passwordHash'>>;

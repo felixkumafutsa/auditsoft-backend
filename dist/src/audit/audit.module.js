@@ -18,11 +18,13 @@ const audit_risk_service_1 = require("./audit-risk.service");
 const audit_approval_service_1 = require("./audit-approval.service");
 const audit_comments_service_1 = require("./audit-comments.service");
 const bulk_audit_service_1 = require("./bulk-audit.service");
+const notification_module_1 = require("../notification/notification.module");
 let AuditModule = class AuditModule {
 };
 exports.AuditModule = AuditModule;
 exports.AuditModule = AuditModule = __decorate([
     (0, common_1.Module)({
+        imports: [notification_module_1.NotificationModule],
         controllers: [audit_controller_1.AuditController, audit_workflow_controller_1.AuditWorkflowController],
         providers: [
             audit_service_1.AuditService,
@@ -34,6 +36,7 @@ exports.AuditModule = AuditModule = __decorate([
             audit_comments_service_1.AuditCommentsService,
             bulk_audit_service_1.BulkAuditService,
         ],
+        exports: [audit_service_1.AuditService],
     })
 ], AuditModule);
 //# sourceMappingURL=audit.module.js.map

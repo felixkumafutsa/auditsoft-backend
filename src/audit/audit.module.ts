@@ -9,8 +9,10 @@ import { AuditRiskService } from './audit-risk.service';
 import { AuditApprovalService } from './audit-approval.service';
 import { AuditCommentsService } from './audit-comments.service';
 import { BulkAuditService } from './bulk-audit.service';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
+  imports: [NotificationModule],
   controllers: [AuditController, AuditWorkflowController],
   providers: [
     AuditService,
@@ -22,5 +24,6 @@ import { BulkAuditService } from './bulk-audit.service';
     AuditCommentsService,
     BulkAuditService,
   ],
+  exports: [AuditService],
 })
 export class AuditModule {}

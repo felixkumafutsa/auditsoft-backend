@@ -76,7 +76,7 @@ export class UserService {
     return user;
   }
 
-  async findByEmail(email: string): Promise<User | null> {
+  async findByEmail(email: string): Promise<any> {
     return this.prisma.user.findUnique({
       where: { email },
       include: { userRoles: { include: { role: true } } },
