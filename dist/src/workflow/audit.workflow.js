@@ -17,7 +17,7 @@ var AuditStatus;
     AuditStatus["PLANNED"] = "Planned";
     AuditStatus["APPROVED"] = "Approved";
     AuditStatus["IN_PROGRESS"] = "In Progress";
-    AuditStatus["UNDER_REVIEW"] = "Review";
+    AuditStatus["UNDER_REVIEW"] = "Under Review";
     AuditStatus["FINALIZED"] = "Finalized";
     AuditStatus["CLOSED"] = "Closed";
 })(AuditStatus || (exports.AuditStatus = AuditStatus = {}));

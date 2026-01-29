@@ -13,6 +13,10 @@ import { AuditProgramModule } from './audit-program/audit-program.module';
 import { ActionPlanModule } from './action-plan/action-plan.module';
 import { EvidenceModule } from './evidence/evidence.module';
 import { NotificationModule } from './notification/notification.module';
+import { ComplianceModule } from './compliance/compliance.module';
+import { RiskModule } from './risk/risk.module';
+import { ReportsModule } from './reports/reports.module';
+import { AuditUniverseModule } from './audit-universe/audit-universe.module';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
@@ -23,6 +27,10 @@ import { PrismaService } from '../prisma/prisma.service';
     EvidenceModule,
     FindingModule,
     ActionPlanModule,
+    ComplianceModule,
+    RiskModule,
+    ReportsModule,
+    AuditUniverseModule,
     UserModule,
     RoleModule,
     AuthModule,

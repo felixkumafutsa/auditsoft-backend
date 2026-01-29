@@ -7,7 +7,7 @@ export enum AuditStatus {
   PLANNED = 'Planned',
   APPROVED = 'Approved',
   IN_PROGRESS = 'In Progress',
-  UNDER_REVIEW = 'Review',
+  UNDER_REVIEW = 'Under Review',
   FINALIZED = 'Finalized',
   CLOSED = 'Closed',
 }

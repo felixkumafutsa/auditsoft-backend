@@ -223,4 +223,33 @@ export class UserService {
       include: { role: true },
     });
   }
+
+  async getTasks(userId: number) {
+    await this.findOne(userId);
+
+    // Fetch assigned audits that are in progress
+    const assignedAudits = await this.prisma.audit.findMany({
+      where: {
+        assignedAuditors: {
+          some: { id: userId },
+        },
+        status: 'In Progress',
+      },
+      select: {
+        id: true,
+        auditName: true,
+        endDate: true,
+      },
+    });
+
+    // Fetch findings assigned to user that are not closed
+    // Note: Assuming findings might be assigned to a user (not explicitly in schema yet, but logic placeholder)
+    // For now, we'll return audits as tasks
+    return assignedAudits.map(audit => ({
+      id: `audit-${audit.id}`,
+      title: `Execute Audit: ${audit.auditName}`,
+      dueDate: audit.endDate ? audit.endDate.toISOString().split('T')[0] : null,
+      type: 'audit',
+    }));
+  }
 }

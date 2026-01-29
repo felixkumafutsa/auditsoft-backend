@@ -4,7 +4,7 @@ export declare class AuditController {
     private auditService;
     private workflowService;
     constructor(auditService: AuditService, workflowService: AuditWorkflowService);
-    getAll(): Promise<{
+    getAll(req: any): Promise<{
         id: number;
         status: string;
         createdAt: Date;
@@ -16,7 +16,7 @@ export declare class AuditController {
         assignedManagerId: number | null;
         auditUniverseId: number | null;
     }[]>;
-    getOne(id: number): Promise<{
+    getOne(id: number, req: any): Promise<{
         id: number;
         status: string;
         createdAt: Date;
@@ -41,6 +41,20 @@ export declare class AuditController {
         auditUniverseId: number | null;
     }>;
     update(id: number, body: UpdateAuditDto): Promise<{
+        id: number;
+        status: string;
+        createdAt: Date;
+        updatedAt: Date;
+        auditName: string;
+        auditType: string;
+        startDate: Date | null;
+        endDate: Date | null;
+        assignedManagerId: number | null;
+        auditUniverseId: number | null;
+    }>;
+    assignAuditors(id: number, body: {
+        auditorIds: number[];
+    }): Promise<{
         id: number;
         status: string;
         createdAt: Date;

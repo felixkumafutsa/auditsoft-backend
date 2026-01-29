@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Audit } from '@prisma/client';
+import { NotificationService } from '../notification/notification.service';
 
 export class CreateAuditDto {
   auditName: string;
@@ -14,6 +15,7 @@ export class CreateAuditDto {
   endDate?: Date;
   assignedManagerId?: number;
   auditUniverseId?: number;
+  assignedAuditorIds?: number[];
 }
 
 export class UpdateAuditDto {
@@ -23,27 +25,59 @@ export class UpdateAuditDto {
   startDate?: Date;
   endDate?: Date;
   assignedManagerId?: number;
+  assignedAuditorIds?: number[];
 }
 
 @Injectable()
 export class AuditService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationService: NotificationService
+  ) {}
 
-  async findAll(): Promise<Audit[]> {
+  async findAll(user?: any): Promise<Audit[]> {
+    const where: any = {};
+    
+    // Role-based filtering
+    if (user) {
+      // Check if user has Auditor role
+      // user.roles is an array of strings like ['Auditor'] coming from JWT
+      const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
+      const isAuditor = roles.includes('Auditor');
+      
+      if (isAuditor) {
+        where.assignedAuditors = { some: { id: user.id } };
+      }
+    }
+
     return this.prisma.audit.findMany({ 
-      include: { findings: true, auditPrograms: true, assignedManager: true },
+      where,
+      include: { findings: true, auditPrograms: true, assignedManager: true, assignedAuditors: true },
       orderBy: { createdAt: 'desc' }
     });
   }
 
-  async findOne(id: number): Promise<Audit> {
+  async findOne(id: number, user?: any): Promise<Audit> {
     const audit = await this.prisma.audit.findUnique({
       where: { id },
-      include: { findings: true, auditPrograms: true, assignedManager: true },
+      include: { findings: true, auditPrograms: true, assignedManager: true, assignedAuditors: true },
     });
 
     if (!audit) {
       throw new NotFoundException(`Audit with ID ${id} not found`);
+    }
+
+    if (user) {
+      // Check if user has Auditor role
+      const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
+      const isAuditor = roles.includes('Auditor');
+      
+      if (isAuditor) {
+        const isAssigned = audit.assignedAuditors.some((auditor) => auditor.id === user.id);
+        if (!isAssigned) {
+          throw new NotFoundException(`Audit with ID ${id} not found`); // Hiding existence for security
+        }
+      }
     }
 
     return audit;
@@ -63,15 +97,18 @@ export class AuditService {
         endDate: data.endDate,
         assignedManagerId: data.assignedManagerId,
         auditUniverseId: data.auditUniverseId,
+        assignedAuditors: data.assignedAuditorIds ? {
+          connect: data.assignedAuditorIds.map(id => ({ id }))
+        } : undefined,
       },
-      include: { findings: true, auditPrograms: true },
+      include: { findings: true, auditPrograms: true, assignedAuditors: true },
     });
   }
 
   async update(id: number, data: UpdateAuditDto): Promise<Audit> {
     const audit = await this.findOne(id);
 
-    return this.prisma.audit.update({
+    const updatedAudit = await this.prisma.audit.update({
       where: { id },
       data: {
         ...(data.auditName && { auditName: data.auditName }),
@@ -82,9 +119,31 @@ export class AuditService {
         ...(data.assignedManagerId !== undefined && {
           assignedManagerId: data.assignedManagerId,
         }),
+        ...(data.assignedAuditorIds && {
+          assignedAuditors: {
+            set: data.assignedAuditorIds.map(id => ({ id }))
+          }
+        }),
       },
-      include: { findings: true, auditPrograms: true },
+      include: { findings: true, auditPrograms: true, assignedAuditors: true },
     });
+
+    // Send notifications if auditors were assigned
+    if (data.assignedAuditorIds && data.assignedAuditorIds.length > 0) {
+      // Find new auditors (in a real scenario, we might want to diff with existing)
+      // For now, we notify all currently assigned auditors to keep it simple
+      for (const auditorId of data.assignedAuditorIds) {
+         await this.notificationService.create({
+            userId: auditorId,
+            title: 'New Audit Assignment',
+            message: `You have been assigned to audit: ${updatedAudit.auditName}`,
+            type: 'info',
+            link: `/audits/${updatedAudit.id}` // Assuming frontend route
+         });
+      }
+    }
+
+    return updatedAudit;
   }
 
   async delete(id: number): Promise<Audit> {

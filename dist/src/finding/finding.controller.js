@@ -16,6 +16,7 @@ exports.FindingController = void 0;
 const common_1 = require("@nestjs/common");
 const finding_service_1 = require("./finding.service");
 const finding_workflow_1 = require("../workflow/finding.workflow");
+const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 let FindingController = class FindingController {
     findingService;
     workflowService;
@@ -42,8 +43,8 @@ let FindingController = class FindingController {
     getByAudit(auditId) {
         return this.findingService.findByAudit(auditId);
     }
-    create(body) {
-        return this.findingService.create(body);
+    create(body, req) {
+        return this.findingService.create(body, req.user);
     }
     update(id, body) {
         return this.findingService.update(id, body);
@@ -117,8 +118,9 @@ __decorate([
 __decorate([
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [finding_service_1.CreateFindingDto]),
+    __metadata("design:paramtypes", [finding_service_1.CreateFindingDto, Object]),
     __metadata("design:returntype", void 0)
 ], FindingController.prototype, "create", null);
 __decorate([
@@ -161,6 +163,7 @@ __decorate([
 ], FindingController.prototype, "escalate", null);
 exports.FindingController = FindingController = __decorate([
     (0, common_1.Controller)('findings'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __metadata("design:paramtypes", [finding_service_1.FindingService,
         finding_workflow_1.FindingWorkflowService])
 ], FindingController);

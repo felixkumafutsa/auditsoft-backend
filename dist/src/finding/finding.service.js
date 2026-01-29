@@ -13,6 +13,7 @@ exports.FindingService = exports.UpdateFindingDto = exports.CreateFindingDto = v
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const finding_workflow_1 = require("../workflow/finding.workflow");
+const audit_service_1 = require("../audit/audit.service");
 class CreateFindingDto {
     auditId;
     auditProgramId;
@@ -32,9 +33,11 @@ exports.UpdateFindingDto = UpdateFindingDto;
 let FindingService = class FindingService {
     prisma;
     workflowService;
-    constructor(prisma, workflowService) {
+    auditService;
+    constructor(prisma, workflowService, auditService) {
         this.prisma = prisma;
         this.workflowService = workflowService;
+        this.auditService = auditService;
     }
     async findAll() {
         return this.prisma.finding.findMany({
@@ -71,9 +74,12 @@ let FindingService = class FindingService {
             orderBy: { severity: 'desc' },
         });
     }
-    async create(data) {
+    async create(data, user) {
         if (!data.auditId || !data.description || !data.severity) {
             throw new common_1.BadRequestException('auditId, description, and severity are required');
+        }
+        if (user) {
+            await this.auditService.findOne(data.auditId, user);
         }
         return this.prisma.finding.create({
             data: {
@@ -173,6 +179,7 @@ exports.FindingService = FindingService;
 exports.FindingService = FindingService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        finding_workflow_1.FindingWorkflowService])
+        finding_workflow_1.FindingWorkflowService,
+        audit_service_1.AuditService])
 ], FindingService);
 //# sourceMappingURL=finding.service.js.map

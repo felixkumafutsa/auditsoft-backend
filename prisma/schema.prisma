@@ -14,44 +14,46 @@ datasource db {
 // ============ USERS & ROLES ============
 
 model User {
-  id                    Int       @id @default(autoincrement())
-  name                  String
-  email                 String    @unique
-  passwordHash          String
-  status                String    @default("active") // active/inactive
-  mfaEnabled            Boolean   @default(false)
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  status       String   @default("active") // active/inactive
+  mfaEnabled   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  userRoles             UserRole[]
-  auditUniverseOwner    AuditUniverse[]
-  assignedAudits        Audit[] @relation("auditManager")
-  actionPlanOwner       ActionPlan[]
-  uploadedEvidence      Evidence[]
-  auditLogActivity      AuditLog[]
-  risksOwned            Risk[]    @relation("RiskOwner")
-  notifications         Notification[]
+  userRoles          UserRole[]
+  auditUniverseOwner AuditUniverse[]
+  managedAudits      Audit[]         @relation("auditManager")
+  assignedAudits     Audit[]         @relation("auditAuditors")
+  actionPlanOwner    ActionPlan[]
+  uploadedEvidence   Evidence[]
+  auditLogActivity   AuditLog[]
+  risksOwned         Risk[]          @relation("RiskOwner")
+  krisOwned          KRI[]
+  notifications      Notification[]
 }
 
 model Role {
-  id                    Int       @id @default(autoincrement())
-  roleName              String    @unique
-  description           String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id          Int      @id @default(autoincrement())
+  roleName    String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  userRoles             UserRole[]
+  userRoles UserRole[]
 }
 
 model UserRole {
-  id                    Int       @id @default(autoincrement())
-  userId                Int
-  roleId                Int
-  assignedAt            DateTime  @default(now())
-  revokedAt             DateTime?
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  roleId     Int
+  assignedAt DateTime  @default(now())
+  revokedAt  DateTime?
 
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role                  Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roleId])
 }
@@ -59,144 +61,145 @@ model UserRole {
 // ============ AUDIT UNIVERSE ============
 
 model AuditUniverse {
-  id                    Int       @id @default(autoincrement())
-  entityType            String    // Business Unit / Process / System / Vendor
-  entityName            String
-  riskRating            String    // Low / Medium / High / Critical
-  ownerId               Int
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id         Int      @id @default(autoincrement())
+  entityType String // Business Unit / Process / System / Vendor
+  entityName String
+  riskRating String // Low / Medium / High / Critical
+  ownerId    Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  owner                 User      @relation(fields: [ownerId], references: [id])
-  audits                Audit[]
+  owner  User    @relation(fields: [ownerId], references: [id])
+  audits Audit[]
 }
 
 // ============ AUDITS & EXECUTION ============
 
 model Audit {
-  id                    Int       @id @default(autoincrement())
-  auditName             String
-  auditType             String    // Operational / IT / Compliance / Financial
-  status                String    @default("planned") // Planned / Approved / In Progress / Review / Finalized / Closed
-  startDate             DateTime?
-  endDate               DateTime?
-  assignedManagerId     Int?
-  auditUniverseId       Int?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id                Int       @id @default(autoincrement())
+  auditName         String
+  auditType         String // Operational / IT / Compliance / Financial
+  status            String    @default("planned") // Planned / Approved / In Progress / Review / Finalized / Closed
+  startDate         DateTime?
+  endDate           DateTime?
+  assignedManagerId Int?
+  auditUniverseId   Int?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  assignedManager       User?     @relation("auditManager", fields: [assignedManagerId], references: [id])
-  auditUniverse         AuditUniverse? @relation(fields: [auditUniverseId], references: [id])
-  auditPrograms         AuditProgram[]
-  findings              Finding[]
-  risks                 Risk[]    @relation("AuditRisks")
+  assignedManager  User?          @relation("auditManager", fields: [assignedManagerId], references: [id])
+  assignedAuditors User[]         @relation("auditAuditors")
+  auditUniverse    AuditUniverse? @relation(fields: [auditUniverseId], references: [id])
+  auditPrograms    AuditProgram[]
+  findings         Finding[]
+  risks            Risk[]         @relation("AuditRisks")
 }
 
 model AuditProgram {
-  id                    Int       @id @default(autoincrement())
-  auditId               Int
-  procedureName         String
-  controlReference      String?
-  expectedOutcome       String?
-  actualResult          String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id               Int      @id @default(autoincrement())
+  auditId          Int
+  procedureName    String
+  controlReference String?
+  expectedOutcome  String?
+  actualResult     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  audit                 Audit     @relation(fields: [auditId], references: [id], onDelete: Cascade)
-  evidence              Evidence[]
-  findings              Finding[]
-  controlMappings       ControlMapping[]
+  audit           Audit            @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  evidence        Evidence[]
+  findings        Finding[]
+  controlMappings ControlMapping[]
 }
 
 // ============ EVIDENCE ============
 
 model Evidence {
-  id                    Int       @id @default(autoincrement())
-  auditProgramId        Int
-  fileName              String
-  fileType              String
-  fileHash              String
-  uploadedById          Int
-  uploadedAt            DateTime  @default(now())
-  description           String?
-  status                String    @default("active") // Active / Archived
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id             Int      @id @default(autoincrement())
+  auditProgramId Int
+  fileName       String
+  fileType       String
+  fileHash       String
+  uploadedById   Int
+  uploadedAt     DateTime @default(now())
+  description    String?
+  status         String   @default("active") // Active / Archived
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  auditProgram          AuditProgram @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
-  uploadedBy            User      @relation(fields: [uploadedById], references: [id])
+  auditProgram AuditProgram @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
+  uploadedBy   User         @relation(fields: [uploadedById], references: [id])
 }
 
 // ============ FINDINGS & REMEDIATION ============
 
 model Finding {
-  id                    Int       @id @default(autoincrement())
-  auditProgramId        Int?
-  auditId               Int
-  description           String
-  severity              String    // Critical / High / Medium / Low
-  rootCause             String?
-  status                String    @default("identified") // Identified / Validated / Action Assigned / Remediation In Progress / Verified / Closed
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id             Int      @id @default(autoincrement())
+  auditProgramId Int?
+  auditId        Int
+  description    String
+  severity       String // Critical / High / Medium / Low
+  rootCause      String?
+  status         String   @default("identified") // Identified / Validated / Action Assigned / Remediation In Progress / Verified / Closed
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  auditProgram          AuditProgram? @relation(fields: [auditProgramId], references: [id])
-  audit                 Audit     @relation(fields: [auditId], references: [id], onDelete: Cascade)
-  actionPlans           ActionPlan[]
+  auditProgram AuditProgram? @relation(fields: [auditProgramId], references: [id])
+  audit        Audit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  actionPlans  ActionPlan[]
 }
 
 model ActionPlan {
-  id                    Int       @id @default(autoincrement())
-  findingId             Int
-  description           String
-  ownerId               Int?
-  dueDate               DateTime?
-  status                String    @default("open") // Open / In Progress / Verified / Closed
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id          Int       @id @default(autoincrement())
+  findingId   Int
+  description String
+  ownerId     Int?
+  dueDate     DateTime?
+  status      String    @default("open") // Open / In Progress / Verified / Closed
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  finding               Finding   @relation(fields: [findingId], references: [id], onDelete: Cascade)
-  owner                 User?     @relation(fields: [ownerId], references: [id])
+  finding Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  owner   User?   @relation(fields: [ownerId], references: [id])
 }
 
 // ============ AUDIT LOGS ============
 
 model AuditLog {
-  id                    Int       @id @default(autoincrement())
-  userId                Int
-  action                String
-  entityType            String
-  entityId              Int?
-  timestamp             DateTime  @default(now())
-  ipAddress             String?
-  deviceInfo            String?
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  action     String
+  entityType String
+  entityId   Int?
+  timestamp  DateTime @default(now())
+  ipAddress  String?
+  deviceInfo String?
 
-  user                  User      @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }
 
 // ============ COMPLIANCE & FRAMEWORKS ============
 
 model ComplianceFramework {
-  id                    Int       @id @default(autoincrement())
-  frameworkName         String    // ISO, COSO, SOX, COBIT
-  version               String
-  description           String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id            Int      @id @default(autoincrement())
+  frameworkName String // ISO, COSO, SOX, COBIT
+  version       String
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  controlMappings       ControlMapping[]
+  controlMappings ControlMapping[]
 }
 
 model ControlMapping {
-  id                    Int       @id @default(autoincrement())
-  auditProgramId        Int
-  frameworkId           Int
-  coverageStatus        String    // Covered / Not Covered / Partial
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id             Int      @id @default(autoincrement())
+  auditProgramId Int
+  frameworkId    Int
+  coverageStatus String // Covered / Not Covered / Partial
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  auditProgram          AuditProgram @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
-  framework             ComplianceFramework @relation(fields: [frameworkId], references: [id])
+  auditProgram AuditProgram        @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
+  framework    ComplianceFramework @relation(fields: [frameworkId], references: [id])
 
   @@unique([auditProgramId, frameworkId])
 }
@@ -204,14 +207,14 @@ model ControlMapping {
 // ============ INTEGRATIONS ============
 
 model Integration {
-  id                    Int       @id @default(autoincrement())
-  systemName            String    @unique
-  apiEndpoint           String
-  authenticationMethod  String?
-  lastSyncDate          DateTime?
-  status                String    @default("active") // active/inactive
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id                   Int       @id @default(autoincrement())
+  systemName           String    @unique
+  apiEndpoint          String
+  authenticationMethod String?
+  lastSyncDate         DateTime?
+  status               String    @default("active") // active/inactive
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 }
 
 // ============ RISK MANAGEMENT ============
@@ -221,30 +224,52 @@ model Risk {
   riskId      String   @unique // e.g., RISK-001
   title       String
   description String?
-  category    String   // Operational, Financial, Compliance, IT
-  impact      String   // Low, Medium, High, Critical
-  likelihood  String   // Low, Medium, High
+  category    String // Operational, Financial, Compliance, IT
+  impact      String // Low, Medium, High, Critical
+  likelihood  String // Low, Medium, High
   status      String   @default("open") // Open, Mitigated, Accepted
   ownerId     Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  owner       User?    @relation("RiskOwner", fields: [ownerId], references: [id])
-  audits      Audit[]  @relation("AuditRisks")
+  owner  User?   @relation("RiskOwner", fields: [ownerId], references: [id])
+  audits Audit[] @relation("AuditRisks")
+  kris   KRI[]
+}
+
+model KRI {
+  id                Int      @id @default(autoincrement())
+  kriId             String   @unique // e.g. KRI-001
+  name              String
+  description       String?
+  metricType        String // Percentage, Number, Currency
+  targetValue       Float
+  warningThreshold  Float
+  criticalThreshold Float
+  currentValue      Float
+  status            String   @default("green") // green, amber, red
+  frequency         String // Monthly, Quarterly
+  riskId            Int?
+  ownerId           Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  risk  Risk? @relation(fields: [riskId], references: [id])
+  owner User? @relation(fields: [ownerId], references: [id])
 }
 
 // ============ NOTIFICATIONS ============
 
 model Notification {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  title       String
-  message     String
-  type        String   // info, warning, success, error, action_required
-  link        String?  // URL to redirect when clicked
-  isRead      Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String
+  type      String // info, warning, success, error, action_required
+  link      String? // URL to redirect when clicked
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

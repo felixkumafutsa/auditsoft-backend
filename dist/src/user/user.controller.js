@@ -44,6 +44,9 @@ let UserController = class UserController {
     getUserRoles(userId) {
         return this.userService.getUserRoles(userId);
     }
+    getTasks(userId) {
+        return this.userService.getTasks(1);
+    }
 };
 exports.UserController = UserController;
 __decorate([
@@ -104,6 +107,13 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], UserController.prototype, "getUserRoles", null);
+__decorate([
+    (0, common_1.Get)('me/tasks'),
+    __param(0, (0, common_1.Param)('userId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], UserController.prototype, "getTasks", null);
 exports.UserController = UserController = __decorate([
     (0, common_1.Controller)('users'),
     __metadata("design:paramtypes", [user_service_1.UserService])

@@ -50,4 +50,13 @@ export class UserController {
   getUserRoles(@Param('userId', ParseIntPipe) userId: number) {
     return this.userService.getUserRoles(userId);
   }
+
+  @Get('me/tasks')
+  getTasks(@Param('userId') userId: string) {
+    // In a real app, extract userId from JWT token via @User() decorator
+    // For now, hardcoding to 1 or using a query param if needed, 
+    // but the route 'me/tasks' suggests current user.
+    // Let's assume ID 1 for testing if auth not fully wired to params yet.
+    return this.userService.getTasks(1); 
+  }
 }

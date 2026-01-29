@@ -204,6 +204,28 @@ let UserService = class UserService {
             include: { role: true },
         });
     }
+    async getTasks(userId) {
+        await this.findOne(userId);
+        const assignedAudits = await this.prisma.audit.findMany({
+            where: {
+                assignedAuditors: {
+                    some: { id: userId },
+                },
+                status: 'In Progress',
+            },
+            select: {
+                id: true,
+                auditName: true,
+                endDate: true,
+            },
+        });
+        return assignedAudits.map(audit => ({
+            id: `audit-${audit.id}`,
+            title: `Execute Audit: ${audit.auditName}`,
+            dueDate: audit.endDate ? audit.endDate.toISOString().split('T')[0] : null,
+            type: 'audit',
+        }));
+    }
 };
 exports.UserService = UserService;
 exports.UserService = UserService = __decorate([

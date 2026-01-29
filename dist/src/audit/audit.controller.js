@@ -16,6 +16,9 @@ exports.AuditController = void 0;
 const common_1 = require("@nestjs/common");
 const audit_service_1 = require("./audit.service");
 const audit_workflow_1 = require("../workflow/audit.workflow");
+const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
+const roles_guard_1 = require("../common/guards/roles.guard");
+const roles_decorator_1 = require("../common/decorators/roles.decorator");
 let AuditController = class AuditController {
     auditService;
     workflowService;
@@ -23,17 +26,20 @@ let AuditController = class AuditController {
         this.auditService = auditService;
         this.workflowService = workflowService;
     }
-    getAll() {
-        return this.auditService.findAll();
+    getAll(req) {
+        return this.auditService.findAll(req.user);
     }
-    getOne(id) {
-        return this.auditService.findOne(id);
+    getOne(id, req) {
+        return this.auditService.findOne(id, req.user);
     }
     create(body) {
         return this.auditService.create(body);
     }
     update(id, body) {
         return this.auditService.update(id, body);
+    }
+    assignAuditors(id, body) {
+        return this.auditService.update(id, { assignedAuditorIds: body.auditorIds });
     }
     delete(id) {
         return this.auditService.delete(id);
@@ -67,16 +73,19 @@ let AuditController = class AuditController {
 };
 exports.AuditController = AuditController;
 __decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)(),
+    __param(0, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AuditController.prototype, "getAll", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", void 0)
 ], AuditController.prototype, "getOne", null);
 __decorate([
@@ -94,6 +103,15 @@ __decorate([
     __metadata("design:paramtypes", [Number, audit_service_1.UpdateAuditDto]),
     __metadata("design:returntype", void 0)
 ], AuditController.prototype, "update", null);
+__decorate([
+    (0, common_1.Post)(':id/assign'),
+    (0, roles_decorator_1.Roles)('Audit Manager', 'System Administrator'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", void 0)
+], AuditController.prototype, "assignAuditors", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
@@ -132,6 +150,7 @@ __decorate([
 ], AuditController.prototype, "getAllowedTransitions", null);
 exports.AuditController = AuditController = __decorate([
     (0, common_1.Controller)('audits'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     __metadata("design:paramtypes", [audit_service_1.AuditService,
         audit_workflow_1.AuditWorkflowService])
 ], AuditController);

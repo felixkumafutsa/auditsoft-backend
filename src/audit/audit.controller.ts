@@ -8,25 +8,32 @@ import {
   Param,
   ParseIntPipe,
   BadRequestException,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { AuditService, CreateAuditDto, UpdateAuditDto } from './audit.service';
 import { AuditWorkflowService } from '../workflow/audit.workflow';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('audits')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class AuditController {
   constructor(
     private auditService: AuditService,
     private workflowService: AuditWorkflowService,
   ) {}
 
+  @UseGuards(JwtAuthGuard)
   @Get()
-  getAll() {
-    return this.auditService.findAll();
+  getAll(@Req() req: any) {
+    return this.auditService.findAll(req.user);
   }
 
   @Get(':id')
-  getOne(@Param('id', ParseIntPipe) id: number) {
-    return this.auditService.findOne(id);
+  getOne(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.auditService.findOne(id, req.user);
   }
 
   @Post()
@@ -37,6 +44,15 @@ export class AuditController {
   @Put(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateAuditDto) {
     return this.auditService.update(id, body);
+  }
+
+  @Post(':id/assign')
+  @Roles('Audit Manager', 'System Administrator')
+  assignAuditors(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { auditorIds: number[] },
+  ) {
+    return this.auditService.update(id, { assignedAuditorIds: body.auditorIds });
   }
 
   @Delete(':id')

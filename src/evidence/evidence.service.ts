@@ -1,13 +1,33 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EvidenceStatus } from '../workflow/evidence.workflow';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class EvidenceService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditService: AuditService,
+  ) {}
 
-  async create(auditProgramId: number, file: any, description?: string, uploadedById?: number) {
+  async create(auditProgramId: number, file: any, description?: string, uploadedById?: number, user?: any) {
     // In a real application, you would upload the file to S3 or local storage here
     // and get the URL/path and hash.
+
+    if (user) {
+      // Find the audit associated with this program
+      const auditProgram = await this.prisma.auditProgram.findUnique({
+        where: { id: auditProgramId },
+        select: { auditId: true }
+      });
+
+      if (!auditProgram) {
+        throw new BadRequestException('Invalid Audit Program ID');
+      }
+
+      // Verify access to the audit
+      await this.auditService.findOne(auditProgram.auditId, user);
+    }
     
     return this.prisma.evidence.create({
       data: {
@@ -17,7 +37,7 @@ export class EvidenceService {
         fileHash: 'dummy_hash_' + Date.now(), // Placeholder
         uploadedById: uploadedById || 1, // Default to admin/system user if not provided
         description,
-        status: 'active',
+        status: EvidenceStatus.UPLOADED,
       },
     });
   }
@@ -32,6 +52,20 @@ export class EvidenceService {
   async remove(id: number) {
     return this.prisma.evidence.delete({
       where: { id },
+    });
+  }
+
+  async findOne(id: number) {
+    return this.prisma.evidence.findUnique({
+      where: { id },
+      include: { uploadedBy: true },
+    });
+  }
+
+  async updateStatus(id: number, status: string) {
+    return this.prisma.evidence.update({
+      where: { id },
+      data: { status },
     });
   }
 }

@@ -3,8 +3,10 @@ import { FindingService } from './finding.service';
 import { FindingController } from './finding.controller';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FindingWorkflowService } from '../workflow/finding.workflow';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
+  imports: [AuditModule],
   controllers: [FindingController],
   providers: [FindingService, PrismaService, FindingWorkflowService],
   exports: [FindingService],

@@ -3,7 +3,6 @@ dotenv.config(); // Load .env file before anything else
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import * as dotenv from 'dotenv';
 
 async function bootstrap() {
   // Explicitly load .env file

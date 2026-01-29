@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { Finding } from '@prisma/client';
 import { FindingWorkflowService } from '../workflow/finding.workflow';
+import { AuditService } from '../audit/audit.service';
 
 export class CreateFindingDto {
   auditId: number;
@@ -28,6 +29,7 @@ export class FindingService {
   constructor(
     private prisma: PrismaService,
     private workflowService: FindingWorkflowService,
+    private auditService: AuditService,
   ) {}
 
   async findAll(): Promise<Finding[]> {
@@ -70,9 +72,14 @@ export class FindingService {
     });
   }
 
-  async create(data: CreateFindingDto): Promise<Finding> {
+  async create(data: CreateFindingDto, user?: any): Promise<Finding> {
     if (!data.auditId || !data.description || !data.severity) {
       throw new BadRequestException('auditId, description, and severity are required');
+    }
+
+    // Check if user has access to the audit
+    if (user) {
+      await this.auditService.findOne(data.auditId, user);
     }
 
     return this.prisma.finding.create({

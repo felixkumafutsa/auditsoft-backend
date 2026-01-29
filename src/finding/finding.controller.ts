@@ -8,6 +8,8 @@ import {
   Param,
   ParseIntPipe,
   BadRequestException,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   FindingService,
@@ -15,8 +17,10 @@ import {
   UpdateFindingDto,
 } from './finding.service';
 import { FindingWorkflowService } from '../workflow/finding.workflow';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('findings')
+@UseGuards(JwtAuthGuard)
 export class FindingController {
   constructor(
     private findingService: FindingService,
@@ -57,8 +61,8 @@ export class FindingController {
   }
 
   @Post()
-  create(@Body() body: CreateFindingDto) {
-    return this.findingService.create(body);
+  create(@Body() body: CreateFindingDto, @Req() req: any) {
+    return this.findingService.create(body, req.user);
   }
 
   @Put(':id')
