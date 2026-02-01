@@ -32,6 +32,7 @@ model User {
   auditLogActivity   AuditLog[]
   risksOwned         Risk[]          @relation("RiskOwner")
   krisOwned          KRI[]
+  assignedFindings   Finding[]       @relation("FindingAssignee")
   notifications      Notification[]
 }
 
@@ -102,6 +103,7 @@ model AuditProgram {
   controlReference String?
   expectedOutcome  String?
   actualResult     String?
+  reviewerComment  String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -146,6 +148,8 @@ model Finding {
   auditProgram AuditProgram? @relation(fields: [auditProgramId], references: [id])
   audit        Audit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
   actionPlans  ActionPlan[]
+  assignedTo   User?         @relation("FindingAssignee", fields: [assignedToId], references: [id])
+  assignedToId Int?
 }
 
 model ActionPlan {
@@ -208,13 +212,40 @@ model ControlMapping {
 
 model Integration {
   id                   Int       @id @default(autoincrement())
-  systemName           String    @unique
-  apiEndpoint          String
-  authenticationMethod String?
+  systemName           String    @unique // Jira, Slack, SAP
+  type                 String    // ISSUE_TRACKER, MESSAGING, ERP
+  apiEndpoint          String?
+  config               Json?     // Stores API keys, tokens, settings (encrypted ideally)
   lastSyncDate         DateTime?
   status               String    @default("active") // active/inactive
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
+}
+
+// ============ CONTINUOUS AUDITING ============
+
+model AutomatedControl {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  frequency   String   // Hourly, Daily, Weekly
+  script      String   // Logic or reference to script
+  status      String   @default("active") // active/inactive
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  controlRuns ControlRun[]
+}
+
+model ControlRun {
+  id                 Int      @id @default(autoincrement())
+  automatedControlId Int
+  runDate            DateTime @default(now())
+  status             String   // Success, Failure, Error
+  resultSummary      String?
+  createdAt          DateTime @default(now())
+
+  automatedControl AutomatedControl @relation(fields: [automatedControlId], references: [id], onDelete: Cascade)
 }
 
 // ============ RISK MANAGEMENT ============

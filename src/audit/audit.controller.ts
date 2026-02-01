@@ -8,6 +8,7 @@ import {
   Param,
   ParseIntPipe,
   BadRequestException,
+  ForbiddenException,
   UseGuards,
   Req,
 } from '@nestjs/common';
@@ -31,6 +32,11 @@ export class AuditController {
     return this.auditService.findAll(req.user);
   }
 
+  @Get('templates')
+  getTemplates() {
+    return this.auditService.findTemplates();
+  }
+
   @Get(':id')
   getOne(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     return this.auditService.findOne(id, req.user);
@@ -42,7 +48,16 @@ export class AuditController {
   }
 
   @Put(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateAuditDto) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateAuditDto, @Req() req: any) {
+    if (body.status === 'Approved') {
+      const user = req.user;
+      const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
+      const isCAE = roles.includes('Chief Audit Executive (CAE)') || roles.includes('CAE') || roles.includes('Chief Audit Executive');
+      
+      if (!isCAE) {
+        throw new ForbiddenException('Only Chief Audit Executive can approve audits.');
+      }
+    }
     return this.auditService.update(id, body);
   }
 
@@ -80,6 +95,7 @@ export class AuditController {
   async transitionStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { toStatus: string; userRole?: string },
+    @Req() req: any,
   ) {
     const audit = await this.auditService.findOne(id);
     const currentStatus = audit.status;
@@ -102,7 +118,7 @@ export class AuditController {
       );
     }
 
-    return this.auditService.update(id, { status: body.toStatus });
+    return this.auditService.update(id, { status: body.toStatus }, req.user);
   }
 
   @Get(':id/allowed-transitions')

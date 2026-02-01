@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { Finding } from '@prisma/client';
 import { FindingWorkflowService } from '../workflow/finding.workflow';
 import { AuditService } from '../audit/audit.service';
+import { NotificationService } from '../notification/notification.service';
 
 export class CreateFindingDto {
   auditId: number;
@@ -30,6 +31,7 @@ export class FindingService {
     private prisma: PrismaService,
     private workflowService: FindingWorkflowService,
     private auditService: AuditService,
+    private notificationService: NotificationService,
   ) {}
 
   async findAll(): Promise<Finding[]> {
@@ -143,7 +145,57 @@ export class FindingService {
       }
     }
 
-    return this.update(id, { status: toStatus });
+    const updatedFinding = await this.update(id, { status: toStatus });
+
+    // --- Notifications ---
+    try {
+      const audit = await this.auditService.findOne(updatedFinding.auditId) as any;
+      const link = `/audits/${updatedFinding.auditId}`;
+      const findingTitle = `Finding: ${updatedFinding.description.substring(0, 30)}...`;
+
+      // Identified -> Validated: Notify Audit Manager
+      if (currentStatus === 'Identified' && toStatus === 'Validated') {
+         if (audit.assignedManagerId) {
+           await this.notificationService.create({
+             userId: audit.assignedManagerId,
+             title: 'Finding Validated',
+             message: `A finding in audit '${audit.auditName}' has been validated and requires attention.`,
+             type: 'info',
+             link
+           });
+         }
+      }
+
+      // Validated -> Action Assigned: Notify Auditors
+      if (currentStatus === 'Validated' && toStatus === 'Action Assigned') {
+         for (const auditor of audit.assignedAuditors) {
+           await this.notificationService.create({
+             userId: auditor.id,
+             title: 'Action Plan Assigned',
+             message: `Action plan assigned for finding in '${audit.auditName}'.`,
+             type: 'info',
+             link
+           });
+         }
+      }
+
+      // Remediation In Progress -> Verified: Notify Manager
+      if (currentStatus === 'Remediation In Progress' && toStatus === 'Verified') {
+         if (audit.assignedManagerId) {
+           await this.notificationService.create({
+             userId: audit.assignedManagerId,
+             title: 'Finding Verified',
+             message: `Finding remediation in '${audit.auditName}' has been verified.`,
+             type: 'info',
+             link
+           });
+         }
+      }
+    } catch (e) {
+      console.error('Failed to send finding notification', e);
+    }
+
+    return updatedFinding;
   }
 
   async delete(id: number): Promise<Finding> {

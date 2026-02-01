@@ -16,6 +16,18 @@ export declare class AuditController {
         assignedManagerId: number | null;
         auditUniverseId: number | null;
     }[]>;
+    getTemplates(): Promise<{
+        id: number;
+        status: string;
+        createdAt: Date;
+        updatedAt: Date;
+        auditName: string;
+        auditType: string;
+        startDate: Date | null;
+        endDate: Date | null;
+        assignedManagerId: number | null;
+        auditUniverseId: number | null;
+    }[]>;
     getOne(id: number, req: any): Promise<{
         id: number;
         status: string;
@@ -40,7 +52,7 @@ export declare class AuditController {
         assignedManagerId: number | null;
         auditUniverseId: number | null;
     }>;
-    update(id: number, body: UpdateAuditDto): Promise<{
+    update(id: number, body: UpdateAuditDto, req: any): Promise<{
         id: number;
         status: string;
         createdAt: Date;
@@ -83,7 +95,7 @@ export declare class AuditController {
     transitionStatus(id: number, body: {
         toStatus: string;
         userRole?: string;
-    }): Promise<{
+    }, req: any): Promise<{
         id: number;
         status: string;
         createdAt: Date;

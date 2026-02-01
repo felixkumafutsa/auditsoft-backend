@@ -13,12 +13,13 @@ const finding_controller_1 = require("./finding.controller");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const finding_workflow_1 = require("../workflow/finding.workflow");
 const audit_module_1 = require("../audit/audit.module");
+const notification_module_1 = require("../notification/notification.module");
 let FindingModule = class FindingModule {
 };
 exports.FindingModule = FindingModule;
 exports.FindingModule = FindingModule = __decorate([
     (0, common_1.Module)({
-        imports: [audit_module_1.AuditModule],
+        imports: [audit_module_1.AuditModule, notification_module_1.NotificationModule],
         controllers: [finding_controller_1.FindingController],
         providers: [finding_service_1.FindingService, prisma_service_1.PrismaService, finding_workflow_1.FindingWorkflowService],
         exports: [finding_service_1.FindingService],

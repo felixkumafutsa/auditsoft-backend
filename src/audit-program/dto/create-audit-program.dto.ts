@@ -4,4 +4,5 @@ export class CreateAuditProgramDto {
   controlReference?: string;
   expectedOutcome?: string;
   actualResult?: string;
+  reviewerComment?: string;
 }

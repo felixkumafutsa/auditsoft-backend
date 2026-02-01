@@ -3,4 +3,5 @@ export class UpdateAuditProgramDto {
   controlReference?: string;
   expectedOutcome?: string;
   actualResult?: string;
+  reviewerComment?: string;
 }

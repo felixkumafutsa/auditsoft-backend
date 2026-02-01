@@ -2,6 +2,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { Finding } from '@prisma/client';
 import { FindingWorkflowService } from '../workflow/finding.workflow';
 import { AuditService } from '../audit/audit.service';
+import { NotificationService } from '../notification/notification.service';
 export declare class CreateFindingDto {
     auditId: number;
     auditProgramId?: number;
@@ -20,7 +21,8 @@ export declare class FindingService {
     private prisma;
     private workflowService;
     private auditService;
-    constructor(prisma: PrismaService, workflowService: FindingWorkflowService, auditService: AuditService);
+    private notificationService;
+    constructor(prisma: PrismaService, workflowService: FindingWorkflowService, auditService: AuditService, notificationService: NotificationService);
     findAll(): Promise<Finding[]>;
     findOne(id: number): Promise<Finding>;
     findByAudit(auditId: number): Promise<Finding[]>;

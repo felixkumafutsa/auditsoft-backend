@@ -17,6 +17,8 @@ import { ComplianceModule } from './compliance/compliance.module';
 import { RiskModule } from './risk/risk.module';
 import { ReportsModule } from './reports/reports.module';
 import { AuditUniverseModule } from './audit-universe/audit-universe.module';
+import { IntegrationModule } from './integration/integration.module';
+import { ContinuousAuditModule } from './continuous-audit/continuous-audit.module';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
@@ -31,6 +33,8 @@ import { PrismaService } from '../prisma/prisma.service';
     RiskModule,
     ReportsModule,
     AuditUniverseModule,
+    IntegrationModule,
+    ContinuousAuditModule,
     UserModule,
     RoleModule,
     AuthModule,

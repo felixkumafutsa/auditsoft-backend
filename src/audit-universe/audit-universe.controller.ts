@@ -18,13 +18,13 @@ export class AuditUniverseController {
   }
 
   @Get()
-  @Roles('Admin', 'System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)', 'Auditor')
+  @Roles('Admin', 'System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)', 'Auditor', 'Audit Manager', 'Manager')
   findAll() {
     return this.auditUniverseService.findAll();
   }
 
   @Get(':id')
-  @Roles('Admin', 'System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)', 'Auditor')
+  @Roles('Admin', 'System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)', 'Auditor', 'Audit Manager', 'Manager')
   findOne(@Param('id') id: string) {
     return this.auditUniverseService.findOne(+id);
   }

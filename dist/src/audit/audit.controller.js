@@ -29,13 +29,24 @@ let AuditController = class AuditController {
     getAll(req) {
         return this.auditService.findAll(req.user);
     }
+    getTemplates() {
+        return this.auditService.findTemplates();
+    }
     getOne(id, req) {
         return this.auditService.findOne(id, req.user);
     }
     create(body) {
         return this.auditService.create(body);
     }
-    update(id, body) {
+    update(id, body, req) {
+        if (body.status === 'Approved') {
+            const user = req.user;
+            const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
+            const isCAE = roles.includes('Chief Audit Executive (CAE)') || roles.includes('CAE') || roles.includes('Chief Audit Executive');
+            if (!isCAE) {
+                throw new common_1.ForbiddenException('Only Chief Audit Executive can approve audits.');
+            }
+        }
         return this.auditService.update(id, body);
     }
     assignAuditors(id, body) {
@@ -52,7 +63,7 @@ let AuditController = class AuditController {
         const audit = await this.auditService.findOne(id);
         return audit.findings || [];
     }
-    async transitionStatus(id, body) {
+    async transitionStatus(id, body, req) {
         const audit = await this.auditService.findOne(id);
         const currentStatus = audit.status;
         if (!this.workflowService.canTransition(currentStatus, body.toStatus)) {
@@ -62,7 +73,7 @@ let AuditController = class AuditController {
         if (body.userRole && !permittedRoles.includes(body.userRole)) {
             throw new common_1.BadRequestException(`Role ${body.userRole} is not permitted to transition from ${currentStatus} to ${body.toStatus}`);
         }
-        return this.auditService.update(id, { status: body.toStatus });
+        return this.auditService.update(id, { status: body.toStatus }, req.user);
     }
     getAllowedTransitions(id) {
         return this.auditService.findOne(id).then((audit) => ({
@@ -80,6 +91,12 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AuditController.prototype, "getAll", null);
+__decorate([
+    (0, common_1.Get)('templates'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AuditController.prototype, "getTemplates", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
@@ -99,8 +116,9 @@ __decorate([
     (0, common_1.Put)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, audit_service_1.UpdateAuditDto]),
+    __metadata("design:paramtypes", [Number, audit_service_1.UpdateAuditDto, Object]),
     __metadata("design:returntype", void 0)
 ], AuditController.prototype, "update", null);
 __decorate([
@@ -137,8 +155,9 @@ __decorate([
     (0, common_1.Post)(':id/transition'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:paramtypes", [Number, Object, Object]),
     __metadata("design:returntype", Promise)
 ], AuditController.prototype, "transitionStatus", null);
 __decorate([

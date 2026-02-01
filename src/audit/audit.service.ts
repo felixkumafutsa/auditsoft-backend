@@ -16,6 +16,7 @@ export class CreateAuditDto {
   assignedManagerId?: number;
   auditUniverseId?: number;
   assignedAuditorIds?: number[];
+  templateId?: number;
 }
 
 export class UpdateAuditDto {
@@ -36,7 +37,9 @@ export class AuditService {
   ) {}
 
   async findAll(user?: any): Promise<Audit[]> {
-    const where: any = {};
+    const where: any = {
+      status: { not: 'Template' } // Exclude templates from normal list
+    };
     
     // Role-based filtering
     if (user) {
@@ -83,16 +86,24 @@ export class AuditService {
     return audit;
   }
 
-  async create(data: CreateAuditDto): Promise<Audit> {
+  async findTemplates(): Promise<Audit[]> {
+    return this.prisma.audit.findMany({
+      where: { status: 'Template' },
+      include: { auditPrograms: true },
+      orderBy: { auditName: 'asc' }
+    });
+  }
+
+  async create(data: CreateAuditDto, user?: any): Promise<Audit> {
     if (!data.auditName || !data.auditType) {
       throw new BadRequestException('auditName and auditType are required');
     }
 
-    return this.prisma.audit.create({
+    const newAudit = await this.prisma.audit.create({
       data: {
         auditName: data.auditName,
         auditType: data.auditType,
-        status: data.status || 'planned',
+        status: data.status || 'Planned',
         startDate: data.startDate,
         endDate: data.endDate,
         assignedManagerId: data.assignedManagerId,
@@ -103,9 +114,61 @@ export class AuditService {
       },
       include: { findings: true, auditPrograms: true, assignedAuditors: true },
     });
+
+    // Notify CAEs about new audit awaiting approval
+    if (newAudit.status === 'Planned') {
+      const caes = await this.prisma.user.findMany({
+        where: {
+          userRoles: {
+            some: {
+              role: {
+                roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+              }
+            }
+          }
+        }
+      });
+
+      for (const cae of caes) {
+        await this.notificationService.create({
+          userId: cae.id,
+          title: 'New Audit Awaiting Approval',
+          message: `A new audit '${newAudit.auditName}' has been created by ${user?.name || 'a Manager'} and is awaiting your approval.`,
+          type: 'action_required',
+          link: `/audits/${newAudit.id}`
+        });
+      }
+    }
+
+    // Handle Template Cloning
+    if (data.templateId) {
+      const template = await this.prisma.audit.findUnique({
+        where: { id: data.templateId },
+        include: { auditPrograms: true },
+      });
+
+      if (template && template.auditPrograms.length > 0) {
+        // Clone programs
+        for (const program of template.auditPrograms) {
+          await this.prisma.auditProgram.create({
+            data: {
+              auditId: newAudit.id,
+              procedureName: program.procedureName,
+              controlReference: program.controlReference,
+              expectedOutcome: program.expectedOutcome,
+            },
+          });
+        }
+        
+        // Reload audit to include new programs
+        return this.findOne(newAudit.id);
+      }
+    }
+
+    return newAudit;
   }
 
-  async update(id: number, data: UpdateAuditDto): Promise<Audit> {
+  async update(id: number, data: UpdateAuditDto, user?: any): Promise<Audit> {
     const audit = await this.findOne(id);
 
     const updatedAudit = await this.prisma.audit.update({
@@ -125,21 +188,82 @@ export class AuditService {
           }
         }),
       },
-      include: { findings: true, auditPrograms: true, assignedAuditors: true },
+      include: { findings: true, auditPrograms: true, assignedAuditors: true, assignedManager: true },
     });
 
-    // Send notifications if auditors were assigned
+    // --- Notifications Logic ---
+
+    // 1. Assignment Notification
     if (data.assignedAuditorIds && data.assignedAuditorIds.length > 0) {
-      // Find new auditors (in a real scenario, we might want to diff with existing)
-      // For now, we notify all currently assigned auditors to keep it simple
+      const assignerName = user?.name || 'System';
       for (const auditorId of data.assignedAuditorIds) {
+         // Skip if assigning self (unlikely but possible)
+         if (user && user.id === auditorId) continue;
+
          await this.notificationService.create({
             userId: auditorId,
             title: 'New Audit Assignment',
-            message: `You have been assigned to audit: ${updatedAudit.auditName}`,
+            message: `You have been assigned to audit: ${updatedAudit.auditName} by ${assignerName}.`,
             type: 'info',
-            link: `/audits/${updatedAudit.id}` // Assuming frontend route
+            link: `/audits/${updatedAudit.id}`
          });
+      }
+    }
+
+    // 2. Status Change Notifications
+    if (data.status && data.status !== audit.status) {
+      const auditLink = `/audits/${updatedAudit.id}`;
+      const auditName = updatedAudit.auditName;
+
+      // Planned -> Approved: Alert Auditors (Ready to start)
+      if (audit.status === 'Planned' && data.status === 'Approved') {
+        for (const auditor of updatedAudit.assignedAuditors) {
+          await this.notificationService.create({
+            userId: auditor.id,
+            title: 'Audit Approved',
+            message: `Audit '${auditName}' has been approved and is ready to start.`,
+            type: 'info',
+            link: auditLink
+          });
+        }
+      }
+
+      // In Progress -> Under Review: Alert Manager
+      if (audit.status === 'In Progress' && data.status === 'Under Review') {
+        if (updatedAudit.assignedManagerId) {
+          await this.notificationService.create({
+            userId: updatedAudit.assignedManagerId,
+            title: 'Audit Ready for Review',
+            message: `Audit '${auditName}' has been submitted for review.`,
+            type: 'action_required',
+            link: auditLink
+          });
+        }
+      }
+
+      // Under Review -> Finalized: Alert CAE
+      if (audit.status === 'Under Review' && data.status === 'Finalized') {
+        const caes = await this.prisma.user.findMany({
+          where: {
+            userRoles: {
+              some: {
+                role: {
+                  roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+                }
+              }
+            }
+          }
+        });
+        
+        for (const cae of caes) {
+          await this.notificationService.create({
+            userId: cae.id,
+            title: 'Audit Finalized',
+            message: `Audit '${auditName}' has been finalized.`,
+            type: 'info',
+            link: auditLink
+          });
+        }
       }
     }
 

@@ -7,13 +7,18 @@ import {
   Param,
   Delete,
   ParseIntPipe,
+  UseGuards,
 } from '@nestjs/common';
 import { AuditProgramService } from './audit-program.service';
 import { CreateAuditProgramDto } from './dto/create-audit-program.dto';
 import { UpdateAuditProgramDto } from './dto/update-audit-program.dto';
 import { EvidenceService } from '../evidence/evidence.service';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('audit-programs')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class AuditProgramController {
   constructor(
     private readonly auditProgramService: AuditProgramService,
@@ -21,6 +26,7 @@ export class AuditProgramController {
   ) {}
 
   @Post()
+  @Roles('Admin', 'Manager', 'Audit Manager', 'CAE', 'Chief Audit Executive (CAE)')
   create(@Body() createDto: CreateAuditProgramDto) {
     return this.auditProgramService.create(createDto);
   }
@@ -41,6 +47,8 @@ export class AuditProgramController {
   }
 
   @Put(':id')
+  // Auditors can update actualResult and reviewerComment, so we might need more granular control or allow Update for execution
+  // For now, let's assume update is allowed for execution (Auditor) but create is restricted
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateAuditProgramDto,
@@ -49,6 +57,7 @@ export class AuditProgramController {
   }
 
   @Delete(':id')
+  @Roles('Admin', 'Manager', 'Audit Manager', 'CAE', 'Chief Audit Executive (CAE)')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.auditProgramService.remove(id);
   }

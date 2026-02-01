@@ -26,6 +26,8 @@ const compliance_module_1 = require("./compliance/compliance.module");
 const risk_module_1 = require("./risk/risk.module");
 const reports_module_1 = require("./reports/reports.module");
 const audit_universe_module_1 = require("./audit-universe/audit-universe.module");
+const integration_module_1 = require("./integration/integration.module");
+const continuous_audit_module_1 = require("./continuous-audit/continuous-audit.module");
 const prisma_service_1 = require("../prisma/prisma.service");
 let AppModule = class AppModule {
 };
@@ -43,6 +45,8 @@ exports.AppModule = AppModule = __decorate([
             risk_module_1.RiskModule,
             reports_module_1.ReportsModule,
             audit_universe_module_1.AuditUniverseModule,
+            integration_module_1.IntegrationModule,
+            continuous_audit_module_1.ContinuousAuditModule,
             user_module_1.UserModule,
             role_module_1.RoleModule,
             auth_module_1.AuthModule,

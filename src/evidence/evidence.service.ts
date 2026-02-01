@@ -3,11 +3,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EvidenceStatus } from '../workflow/evidence.workflow';
 import { AuditService } from '../audit/audit.service';
 
+import { NotificationService } from '../notification/notification.service';
+
 @Injectable()
 export class EvidenceService {
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
+    private notificationService: NotificationService,
   ) {}
 
   async create(auditProgramId: number, file: any, description?: string, uploadedById?: number, user?: any) {
@@ -63,9 +66,33 @@ export class EvidenceService {
   }
 
   async updateStatus(id: number, status: string) {
-    return this.prisma.evidence.update({
+    const updatedEvidence = await this.prisma.evidence.update({
       where: { id },
       data: { status },
+      include: { auditProgram: true }
     });
+
+    // Notifications
+    try {
+      if (status === 'Reviewed') {
+        const auditProgram = updatedEvidence.auditProgram;
+        const audit = await this.auditService.findOne(auditProgram.auditId);
+        
+        // Notify Manager
+        if (audit.assignedManagerId) {
+          await this.notificationService.create({
+            userId: audit.assignedManagerId,
+            title: 'Evidence Reviewed',
+            message: `Evidence '${updatedEvidence.fileName}' in audit '${audit.auditName}' has been marked as Reviewed.`,
+            type: 'info',
+            link: `/audits/${audit.id}`
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to send evidence notification', e);
+    }
+
+    return updatedEvidence;
   }
 }

@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const finding_workflow_1 = require("../workflow/finding.workflow");
 const audit_service_1 = require("../audit/audit.service");
+const notification_service_1 = require("../notification/notification.service");
 class CreateFindingDto {
     auditId;
     auditProgramId;
@@ -34,10 +35,12 @@ let FindingService = class FindingService {
     prisma;
     workflowService;
     auditService;
-    constructor(prisma, workflowService, auditService) {
+    notificationService;
+    constructor(prisma, workflowService, auditService, notificationService) {
         this.prisma = prisma;
         this.workflowService = workflowService;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
     async findAll() {
         return this.prisma.finding.findMany({
@@ -126,7 +129,49 @@ let FindingService = class FindingService {
                 throw new common_1.BadRequestException(`Role ${userRole} is not permitted to transition from ${currentStatus} to ${toStatus}`);
             }
         }
-        return this.update(id, { status: toStatus });
+        const updatedFinding = await this.update(id, { status: toStatus });
+        try {
+            const audit = await this.auditService.findOne(updatedFinding.auditId);
+            const link = `/audits/${updatedFinding.auditId}`;
+            const findingTitle = `Finding: ${updatedFinding.description.substring(0, 30)}...`;
+            if (currentStatus === 'Identified' && toStatus === 'Validated') {
+                if (audit.assignedManagerId) {
+                    await this.notificationService.create({
+                        userId: audit.assignedManagerId,
+                        title: 'Finding Validated',
+                        message: `A finding in audit '${audit.auditName}' has been validated and requires attention.`,
+                        type: 'info',
+                        link
+                    });
+                }
+            }
+            if (currentStatus === 'Validated' && toStatus === 'Action Assigned') {
+                for (const auditor of audit.assignedAuditors) {
+                    await this.notificationService.create({
+                        userId: auditor.id,
+                        title: 'Action Plan Assigned',
+                        message: `Action plan assigned for finding in '${audit.auditName}'.`,
+                        type: 'info',
+                        link
+                    });
+                }
+            }
+            if (currentStatus === 'Remediation In Progress' && toStatus === 'Verified') {
+                if (audit.assignedManagerId) {
+                    await this.notificationService.create({
+                        userId: audit.assignedManagerId,
+                        title: 'Finding Verified',
+                        message: `Finding remediation in '${audit.auditName}' has been verified.`,
+                        type: 'info',
+                        link
+                    });
+                }
+            }
+        }
+        catch (e) {
+            console.error('Failed to send finding notification', e);
+        }
+        return updatedFinding;
     }
     async delete(id) {
         const finding = await this.findOne(id);
@@ -180,6 +225,7 @@ exports.FindingService = FindingService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         finding_workflow_1.FindingWorkflowService,
-        audit_service_1.AuditService])
+        audit_service_1.AuditService,
+        notification_service_1.NotificationService])
 ], FindingService);
 //# sourceMappingURL=finding.service.js.map

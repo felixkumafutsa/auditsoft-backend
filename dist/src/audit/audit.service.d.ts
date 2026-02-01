@@ -10,6 +10,7 @@ export declare class CreateAuditDto {
     assignedManagerId?: number;
     auditUniverseId?: number;
     assignedAuditorIds?: number[];
+    templateId?: number;
 }
 export declare class UpdateAuditDto {
     auditName?: string;
@@ -26,7 +27,8 @@ export declare class AuditService {
     constructor(prisma: PrismaService, notificationService: NotificationService);
     findAll(user?: any): Promise<Audit[]>;
     findOne(id: number, user?: any): Promise<Audit>;
-    create(data: CreateAuditDto): Promise<Audit>;
-    update(id: number, data: UpdateAuditDto): Promise<Audit>;
+    findTemplates(): Promise<Audit[]>;
+    create(data: CreateAuditDto, user?: any): Promise<Audit>;
+    update(id: number, data: UpdateAuditDto, user?: any): Promise<Audit>;
     delete(id: number): Promise<Audit>;
 }

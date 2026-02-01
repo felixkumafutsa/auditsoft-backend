@@ -22,6 +22,7 @@ class CreateAuditDto {
     assignedManagerId;
     auditUniverseId;
     assignedAuditorIds;
+    templateId;
 }
 exports.CreateAuditDto = CreateAuditDto;
 class UpdateAuditDto {
@@ -42,7 +43,9 @@ let AuditService = class AuditService {
         this.notificationService = notificationService;
     }
     async findAll(user) {
-        const where = {};
+        const where = {
+            status: { not: 'Template' }
+        };
         if (user) {
             const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
             const isAuditor = roles.includes('Auditor');
@@ -76,15 +79,22 @@ let AuditService = class AuditService {
         }
         return audit;
     }
-    async create(data) {
+    async findTemplates() {
+        return this.prisma.audit.findMany({
+            where: { status: 'Template' },
+            include: { auditPrograms: true },
+            orderBy: { auditName: 'asc' }
+        });
+    }
+    async create(data, user) {
         if (!data.auditName || !data.auditType) {
             throw new common_1.BadRequestException('auditName and auditType are required');
         }
-        return this.prisma.audit.create({
+        const newAudit = await this.prisma.audit.create({
             data: {
                 auditName: data.auditName,
                 auditType: data.auditType,
-                status: data.status || 'planned',
+                status: data.status || 'Planned',
                 startDate: data.startDate,
                 endDate: data.endDate,
                 assignedManagerId: data.assignedManagerId,
@@ -95,8 +105,50 @@ let AuditService = class AuditService {
             },
             include: { findings: true, auditPrograms: true, assignedAuditors: true },
         });
+        if (newAudit.status === 'Planned') {
+            const caes = await this.prisma.user.findMany({
+                where: {
+                    userRoles: {
+                        some: {
+                            role: {
+                                roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+                            }
+                        }
+                    }
+                }
+            });
+            for (const cae of caes) {
+                await this.notificationService.create({
+                    userId: cae.id,
+                    title: 'New Audit Awaiting Approval',
+                    message: `A new audit '${newAudit.auditName}' has been created by ${user?.name || 'a Manager'} and is awaiting your approval.`,
+                    type: 'action_required',
+                    link: `/audits/${newAudit.id}`
+                });
+            }
+        }
+        if (data.templateId) {
+            const template = await this.prisma.audit.findUnique({
+                where: { id: data.templateId },
+                include: { auditPrograms: true },
+            });
+            if (template && template.auditPrograms.length > 0) {
+                for (const program of template.auditPrograms) {
+                    await this.prisma.auditProgram.create({
+                        data: {
+                            auditId: newAudit.id,
+                            procedureName: program.procedureName,
+                            controlReference: program.controlReference,
+                            expectedOutcome: program.expectedOutcome,
+                        },
+                    });
+                }
+                return this.findOne(newAudit.id);
+            }
+        }
+        return newAudit;
     }
-    async update(id, data) {
+    async update(id, data, user) {
         const audit = await this.findOne(id);
         const updatedAudit = await this.prisma.audit.update({
             where: { id },
@@ -115,17 +167,68 @@ let AuditService = class AuditService {
                     }
                 }),
             },
-            include: { findings: true, auditPrograms: true, assignedAuditors: true },
+            include: { findings: true, auditPrograms: true, assignedAuditors: true, assignedManager: true },
         });
         if (data.assignedAuditorIds && data.assignedAuditorIds.length > 0) {
+            const assignerName = user?.name || 'System';
             for (const auditorId of data.assignedAuditorIds) {
+                if (user && user.id === auditorId)
+                    continue;
                 await this.notificationService.create({
                     userId: auditorId,
                     title: 'New Audit Assignment',
-                    message: `You have been assigned to audit: ${updatedAudit.auditName}`,
+                    message: `You have been assigned to audit: ${updatedAudit.auditName} by ${assignerName}.`,
                     type: 'info',
                     link: `/audits/${updatedAudit.id}`
                 });
+            }
+        }
+        if (data.status && data.status !== audit.status) {
+            const auditLink = `/audits/${updatedAudit.id}`;
+            const auditName = updatedAudit.auditName;
+            if (audit.status === 'Planned' && data.status === 'Approved') {
+                for (const auditor of updatedAudit.assignedAuditors) {
+                    await this.notificationService.create({
+                        userId: auditor.id,
+                        title: 'Audit Approved',
+                        message: `Audit '${auditName}' has been approved and is ready to start.`,
+                        type: 'info',
+                        link: auditLink
+                    });
+                }
+            }
+            if (audit.status === 'In Progress' && data.status === 'Under Review') {
+                if (updatedAudit.assignedManagerId) {
+                    await this.notificationService.create({
+                        userId: updatedAudit.assignedManagerId,
+                        title: 'Audit Ready for Review',
+                        message: `Audit '${auditName}' has been submitted for review.`,
+                        type: 'action_required',
+                        link: auditLink
+                    });
+                }
+            }
+            if (audit.status === 'Under Review' && data.status === 'Finalized') {
+                const caes = await this.prisma.user.findMany({
+                    where: {
+                        userRoles: {
+                            some: {
+                                role: {
+                                    roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+                                }
+                            }
+                        }
+                    }
+                });
+                for (const cae of caes) {
+                    await this.notificationService.create({
+                        userId: cae.id,
+                        title: 'Audit Finalized',
+                        message: `Audit '${auditName}' has been finalized.`,
+                        type: 'info',
+                        link: auditLink
+                    });
+                }
             }
         }
         return updatedAudit;
