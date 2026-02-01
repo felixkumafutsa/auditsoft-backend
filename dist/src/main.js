@@ -41,11 +41,10 @@ async function bootstrap() {
     dotenv.config();
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     app.enableCors({
-        origin: ['https://mw265.com', 'http://localhost:3001'],
+        origin: true,
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
         credentials: true,
     });
-    app.setGlobalPrefix('api');
     const dbUrl = process.env.DATABASE_URL;
     if (dbUrl) {
         const maskedUrl = dbUrl.replace(/:([^:@]+)@/, ':****@');
@@ -54,7 +53,7 @@ async function bootstrap() {
     else {
         console.error('[Bootstrap] CRITICAL: DATABASE_URL is not defined!');
     }
-    const port = process.env.PORT || 3002;
+    const port = process.env.PORT || 4000;
     await app.listen(port);
     console.log(`Application is running on: ${await app.getUrl()}`);
 }

@@ -9,15 +9,15 @@ async function bootstrap() {
   dotenv.config();
 
   const app = await NestFactory.create(AppModule);
+  // app.setGlobalPrefix('api'); // Removed global prefix
 
   // Enable CORS for all origins (for debugging)
-app.enableCors({
-  origin: ['https://mw265.com', 'http://localhost:3001'], // Add your actual domain
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-  credentials: true,
-});
+  app.enableCors({
+    origin: true, // Allow all origins temporarily to debug CORS
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
 
-  app.setGlobalPrefix('api');
   
   // Debug: Log Database URL (masked)
   const dbUrl = process.env.DATABASE_URL;
@@ -28,7 +28,7 @@ app.enableCors({
     console.error('[Bootstrap] CRITICAL: DATABASE_URL is not defined!');
   }
 
-  const port = process.env.PORT || 3002;
+  const port = process.env.PORT || 4000;
   await app.listen(port);
   console.log(`Application is running on: ${await app.getUrl()}`);
 }
