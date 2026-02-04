@@ -98,7 +98,7 @@ export class RiskService {
 
   async updateKri(id: number, updateKriDto: UpdateKriDto) {
     // If value or thresholds changed, recalculate status
-    let status = undefined;
+    const status = undefined;
     if (updateKriDto.currentValue !== undefined) {
         // Need to fetch current thresholds if not provided
         // For simplicity, assuming if we update value we might update status manually or logic needs full object

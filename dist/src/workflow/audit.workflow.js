@@ -56,7 +56,7 @@ let AuditWorkflowService = class AuditWorkflowService {
         let title = '';
         let message = '';
         let type = 'info';
-        let targetUserId = managerId;
+        const targetUserId = managerId;
         switch (status) {
             case AuditStatus.APPROVED:
                 title = 'Audit Approved';

@@ -19,6 +19,7 @@ export declare class UpdateAuditDto {
     startDate?: Date;
     endDate?: Date;
     assignedManagerId?: number;
+    auditUniverseId?: number;
     assignedAuditorIds?: number[];
 }
 export declare class AuditService {

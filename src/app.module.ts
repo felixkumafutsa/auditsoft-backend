@@ -13,6 +13,7 @@ import { AuditProgramModule } from './audit-program/audit-program.module';
 import { ActionPlanModule } from './action-plan/action-plan.module';
 import { EvidenceModule } from './evidence/evidence.module';
 import { NotificationModule } from './notification/notification.module';
+import { MessagingModule } from './messaging/messaging.module';
 import { ComplianceModule } from './compliance/compliance.module';
 import { RiskModule } from './risk/risk.module';
 import { ReportsModule } from './reports/reports.module';
@@ -41,6 +42,7 @@ import { PrismaService } from '../prisma/prisma.service';
     AdminModule,
     AuditLogModule,
     NotificationModule,
+    MessagingModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

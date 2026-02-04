@@ -10,8 +10,8 @@ export enum EvidenceStatus {
 @Injectable()
 export class EvidenceWorkflowService {
   private readonly validTransitions: Record<EvidenceStatus, EvidenceStatus[]> = {
-    [EvidenceStatus.UPLOADED]: [EvidenceStatus.REVIEWED],
-    [EvidenceStatus.REVIEWED]: [EvidenceStatus.APPROVED],
+    [EvidenceStatus.UPLOADED]: [EvidenceStatus.REVIEWED, EvidenceStatus.ARCHIVED],
+    [EvidenceStatus.REVIEWED]: [EvidenceStatus.APPROVED, EvidenceStatus.UPLOADED], // Back to uploaded if rejected? Or just Approved.
     [EvidenceStatus.APPROVED]: [EvidenceStatus.ARCHIVED],
     [EvidenceStatus.ARCHIVED]: [], // Terminal state
   };
@@ -50,12 +50,14 @@ export class EvidenceWorkflowService {
     const transitions: Record<string, Record<string, string[]>> = {
       [EvidenceStatus.UPLOADED]: {
         [EvidenceStatus.REVIEWED]: ['Auditor', 'Audit Manager'],
+        [EvidenceStatus.ARCHIVED]: ['Audit Manager', 'System Administrator'],
       },
       [EvidenceStatus.REVIEWED]: {
         [EvidenceStatus.APPROVED]: ['Audit Manager', 'Chief Audit Executive (CAE)'],
+        [EvidenceStatus.UPLOADED]: ['Audit Manager'], // Rejection
       },
       [EvidenceStatus.APPROVED]: {
-        [EvidenceStatus.ARCHIVED]: ['System Administrator', 'Chief Audit Executive (CAE)'],
+        [EvidenceStatus.ARCHIVED]: ['System Administrator'],
       },
     };
 

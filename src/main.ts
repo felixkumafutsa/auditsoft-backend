@@ -9,7 +9,7 @@ async function bootstrap() {
   dotenv.config();
 
   const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix('api'); // Re-enable global prefix to match existing routes
+  app.setGlobalPrefix('api'); // Re-enable global prefix to existing routes
 
 
   // Enable CORS for all origins (for debugging)

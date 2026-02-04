@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { EvidenceStatus } from '../workflow/evidence.workflow';
+import { EvidenceStatus, EvidenceWorkflowService } from '../workflow/evidence.workflow';
 import { AuditService } from '../audit/audit.service';
 
 import { NotificationService } from '../notification/notification.service';
@@ -11,6 +11,7 @@ export class EvidenceService {
     private prisma: PrismaService,
     private auditService: AuditService,
     private notificationService: NotificationService,
+    private workflowService: EvidenceWorkflowService,
   ) {}
 
   async create(auditProgramId: number, file: any, description?: string, uploadedById?: number, user?: any) {
@@ -66,6 +67,14 @@ export class EvidenceService {
   }
 
   async updateStatus(id: number, status: string) {
+    const evidence = await this.findOne(id);
+    if (!evidence) throw new BadRequestException('Evidence not found');
+
+    // Validate Transition
+    if (!this.workflowService.canTransition(evidence.status, status)) {
+        throw new BadRequestException(`Cannot transition evidence from ${evidence.status} to ${status}`);
+    }
+
     const updatedEvidence = await this.prisma.evidence.update({
       where: { id },
       data: { status },
@@ -74,21 +83,44 @@ export class EvidenceService {
 
     // Notifications
     try {
-      if (status === 'Reviewed') {
         const auditProgram = updatedEvidence.auditProgram;
         const audit = await this.auditService.findOne(auditProgram.auditId);
-        
-        // Notify Manager
-        if (audit.assignedManagerId) {
-          await this.notificationService.create({
-            userId: audit.assignedManagerId,
-            title: 'Evidence Reviewed',
-            message: `Evidence '${updatedEvidence.fileName}' in audit '${audit.auditName}' has been marked as Reviewed.`,
-            type: 'info',
-            link: `/audits/${audit.id}`
-          });
+        const auditName = audit.auditName;
+        const link = `/audits/${audit.id}`; // Or evidence specific link
+
+        // Reviewed: Notify Manager
+        if (status === EvidenceStatus.REVIEWED && audit.assignedManagerId) {
+            await this.notificationService.create({
+                userId: audit.assignedManagerId,
+                title: 'Evidence Reviewed',
+                message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' marked as Reviewed.`,
+                type: 'info',
+                link
+            });
         }
-      }
+
+        // Approved: Notify Uploader (Auditor)
+        if (status === EvidenceStatus.APPROVED) {
+            await this.notificationService.create({
+                userId: updatedEvidence.uploadedById,
+                title: 'Evidence Approved',
+                message: `Your evidence '${updatedEvidence.fileName}' in '${auditName}' has been approved.`,
+                type: 'success',
+                link
+            });
+        }
+
+        // Rejected (Back to Uploaded from Reviewed): Notify Uploader
+        if (evidence.status === EvidenceStatus.REVIEWED && status === EvidenceStatus.UPLOADED) {
+             await this.notificationService.create({
+                userId: updatedEvidence.uploadedById,
+                title: 'Evidence Rejected',
+                message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' was rejected/returned.`,
+                type: 'warning',
+                link
+            });
+        }
+
     } catch (e) {
       console.error('Failed to send evidence notification', e);
     }

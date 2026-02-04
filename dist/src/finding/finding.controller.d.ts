@@ -11,8 +11,8 @@ export declare class FindingController {
         updatedAt: Date;
         description: string;
         auditId: number;
-        severity: string;
         auditProgramId: number | null;
+        severity: string;
         rootCause: string | null;
         assignedToId: number | null;
     }[]>;
@@ -23,8 +23,8 @@ export declare class FindingController {
         updatedAt: Date;
         description: string;
         auditId: number;
-        severity: string;
         auditProgramId: number | null;
+        severity: string;
         rootCause: string | null;
         assignedToId: number | null;
     }[]>;
@@ -35,8 +35,8 @@ export declare class FindingController {
         updatedAt: Date;
         description: string;
         auditId: number;
-        severity: string;
         auditProgramId: number | null;
+        severity: string;
         rootCause: string | null;
         assignedToId: number | null;
     }[]>;
@@ -47,8 +47,8 @@ export declare class FindingController {
         updatedAt: Date;
         description: string;
         auditId: number;
-        severity: string;
         auditProgramId: number | null;
+        severity: string;
         rootCause: string | null;
         assignedToId: number | null;
     }>;
@@ -60,8 +60,8 @@ export declare class FindingController {
         updatedAt: Date;
         description: string;
         auditId: number;
-        severity: string;
         auditProgramId: number | null;
+        severity: string;
         rootCause: string | null;
         assignedToId: number | null;
     }[]>;
@@ -72,8 +72,8 @@ export declare class FindingController {
         updatedAt: Date;
         description: string;
         auditId: number;
-        severity: string;
         auditProgramId: number | null;
+        severity: string;
         rootCause: string | null;
         assignedToId: number | null;
     }>;
@@ -84,8 +84,8 @@ export declare class FindingController {
         updatedAt: Date;
         description: string;
         auditId: number;
-        severity: string;
         auditProgramId: number | null;
+        severity: string;
         rootCause: string | null;
         assignedToId: number | null;
     }>;
@@ -96,8 +96,8 @@ export declare class FindingController {
         updatedAt: Date;
         description: string;
         auditId: number;
-        severity: string;
         auditProgramId: number | null;
+        severity: string;
         rootCause: string | null;
         assignedToId: number | null;
     }>;
@@ -111,8 +111,8 @@ export declare class FindingController {
         updatedAt: Date;
         description: string;
         auditId: number;
-        severity: string;
         auditProgramId: number | null;
+        severity: string;
         rootCause: string | null;
         assignedToId: number | null;
     }>;

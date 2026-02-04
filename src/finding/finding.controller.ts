@@ -49,9 +49,9 @@ export class FindingController {
 
   @Get(':id/action-plans')
   async getActionPlans(@Param('id', ParseIntPipe) id: number) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const finding: any = await this.findingService.findOne(id);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return
+     
     return finding.actionPlans || [];
   }
 

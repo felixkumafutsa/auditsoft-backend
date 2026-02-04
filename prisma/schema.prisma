@@ -34,6 +34,23 @@ model User {
   krisOwned          KRI[]
   assignedFindings   Finding[]       @relation("FindingAssignee")
   notifications      Notification[]
+  generatedReports   Report[]
+  sentMessages       Message[]       @relation("SentMessages")
+  receivedMessages   Message[]       @relation("ReceivedMessages")
+}
+
+// ============ MESSAGING ============
+
+model Message {
+  id         Int      @id @default(autoincrement())
+  senderId   Int
+  receiverId Int
+  content    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
 }
 
 model Role {
@@ -80,7 +97,7 @@ model Audit {
   id                Int       @id @default(autoincrement())
   auditName         String
   auditType         String // Operational / IT / Compliance / Financial
-  status            String    @default("planned") // Planned / Approved / In Progress / Review / Finalized / Closed
+  status            String    @default("Planned") // Planned / Approved / In Progress / Under Review / Finalized / Closed
   startDate         DateTime?
   endDate           DateTime?
   assignedManagerId Int?
@@ -94,6 +111,7 @@ model Audit {
   auditPrograms    AuditProgram[]
   findings         Finding[]
   risks            Risk[]         @relation("AuditRisks")
+  reports          Report[]
 }
 
 model AuditProgram {
@@ -111,6 +129,21 @@ model AuditProgram {
   evidence        Evidence[]
   findings        Finding[]
   controlMappings ControlMapping[]
+}
+
+// ============ REPORTS ============
+
+model Report {
+  id          Int      @id @default(autoincrement())
+  auditId     Int
+  title       String
+  generatedBy Int // User ID of who generated it
+  generatedAt DateTime @default(now())
+  fileUrl     String? // Path to stored PDF/DOCX
+  fileType    String? // "pdf" or "docx"
+
+  audit     Audit @relation(fields: [auditId], references: [id])
+  generator User  @relation(fields: [generatedBy], references: [id])
 }
 
 // ============ EVIDENCE ============
@@ -141,7 +174,7 @@ model Finding {
   description    String
   severity       String // Critical / High / Medium / Low
   rootCause      String?
-  status         String   @default("identified") // Identified / Validated / Action Assigned / Remediation In Progress / Verified / Closed
+  status         String   @default("Identified") // Identified / Validated / Action Assigned / Remediation In Progress / Verified / Closed
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -211,15 +244,15 @@ model ControlMapping {
 // ============ INTEGRATIONS ============
 
 model Integration {
-  id                   Int       @id @default(autoincrement())
-  systemName           String    @unique // Jira, Slack, SAP
-  type                 String    // ISSUE_TRACKER, MESSAGING, ERP
-  apiEndpoint          String?
-  config               Json?     // Stores API keys, tokens, settings (encrypted ideally)
-  lastSyncDate         DateTime?
-  status               String    @default("active") // active/inactive
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  id           Int       @id @default(autoincrement())
+  systemName   String    @unique // Jira, Slack, SAP
+  type         String // ISSUE_TRACKER, MESSAGING, ERP
+  apiEndpoint  String?
+  config       Json? // Stores API keys, tokens, settings (encrypted ideally)
+  lastSyncDate DateTime?
+  status       String    @default("active") // active/inactive
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 // ============ CONTINUOUS AUDITING ============
@@ -228,8 +261,8 @@ model AutomatedControl {
   id          Int      @id @default(autoincrement())
   name        String
   description String?
-  frequency   String   // Hourly, Daily, Weekly
-  script      String   // Logic or reference to script
+  frequency   String // Hourly, Daily, Weekly
+  script      String // Logic or reference to script
   status      String   @default("active") // active/inactive
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -241,7 +274,7 @@ model ControlRun {
   id                 Int      @id @default(autoincrement())
   automatedControlId Int
   runDate            DateTime @default(now())
-  status             String   // Success, Failure, Error
+  status             String // Success, Failure, Error
   resultSummary      String?
   createdAt          DateTime @default(now())
 

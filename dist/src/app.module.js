@@ -22,6 +22,7 @@ const audit_program_module_1 = require("./audit-program/audit-program.module");
 const action_plan_module_1 = require("./action-plan/action-plan.module");
 const evidence_module_1 = require("./evidence/evidence.module");
 const notification_module_1 = require("./notification/notification.module");
+const messaging_module_1 = require("./messaging/messaging.module");
 const compliance_module_1 = require("./compliance/compliance.module");
 const risk_module_1 = require("./risk/risk.module");
 const reports_module_1 = require("./reports/reports.module");
@@ -53,6 +54,7 @@ exports.AppModule = AppModule = __decorate([
             admin_module_1.AdminModule,
             audit_log_module_1.AuditLogModule,
             notification_module_1.NotificationModule,
+            messaging_module_1.MessagingModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService, prisma_service_1.PrismaService],

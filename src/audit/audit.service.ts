@@ -26,6 +26,7 @@ export class UpdateAuditDto {
   startDate?: Date;
   endDate?: Date;
   assignedManagerId?: number;
+  auditUniverseId?: number;
   assignedAuditorIds?: number[];
 }
 
@@ -169,54 +170,76 @@ export class AuditService {
   }
 
   async update(id: number, data: UpdateAuditDto, user?: any): Promise<Audit> {
-    const audit = await this.findOne(id);
+    const existingAudit = await this.prisma.audit.findUnique({
+      where: { id },
+      include: { assignedManager: true, assignedAuditors: true }
+    });
+
+    if (!existingAudit) {
+      throw new NotFoundException(`Audit with ID ${id} not found`);
+    }
+
+    // Explicitly pick allowed fields to avoid passing relations (like findings=[]) that cause Prisma errors
+    const { 
+      auditName, 
+      auditType, 
+      status, 
+      startDate, 
+      endDate, 
+      assignedManagerId, 
+      auditUniverseId, 
+      assignedAuditorIds 
+    } = data;
+
+    const updateData: any = {
+      ...(auditName !== undefined && { auditName }),
+      ...(auditType !== undefined && { auditType }),
+      ...(status !== undefined && { status }),
+      ...(startDate !== undefined && { startDate }),
+      ...(endDate !== undefined && { endDate }),
+      ...(assignedManagerId !== undefined && { assignedManagerId }),
+      ...(auditUniverseId !== undefined && { auditUniverseId }),
+    };
+
+    if (assignedAuditorIds) {
+      updateData.assignedAuditors = {
+        set: assignedAuditorIds.map(id => ({ id }))
+      };
+    }
 
     const updatedAudit = await this.prisma.audit.update({
       where: { id },
-      data: {
-        ...(data.auditName && { auditName: data.auditName }),
-        ...(data.auditType && { auditType: data.auditType }),
-        ...(data.status && { status: data.status }),
-        ...(data.startDate && { startDate: data.startDate }),
-        ...(data.endDate && { endDate: data.endDate }),
-        ...(data.assignedManagerId !== undefined && {
-          assignedManagerId: data.assignedManagerId,
-        }),
-        ...(data.assignedAuditorIds && {
-          assignedAuditors: {
-            set: data.assignedAuditorIds.map(id => ({ id }))
-          }
-        }),
-      },
+      data: updateData,
       include: { findings: true, auditPrograms: true, assignedAuditors: true, assignedManager: true },
     });
 
-    // --- Notifications Logic ---
-
-    // 1. Assignment Notification
+    // Notify Auditors if assigned (New Assignments only)
     if (data.assignedAuditorIds && data.assignedAuditorIds.length > 0) {
-      const assignerName = user?.name || 'System';
-      for (const auditorId of data.assignedAuditorIds) {
-         // Skip if assigning self (unlikely but possible)
-         if (user && user.id === auditorId) continue;
+      const newAuditorIds = data.assignedAuditorIds.filter(id => 
+        !existingAudit.assignedAuditors?.some(a => a.id === id)
+      );
 
-         await this.notificationService.create({
-            userId: auditorId,
-            title: 'New Audit Assignment',
-            message: `You have been assigned to audit: ${updatedAudit.auditName} by ${assignerName}.`,
-            type: 'info',
-            link: `/audits/${updatedAudit.id}`
-         });
+      for (const auditorId of newAuditorIds) {
+        // Skip self-notification if user assigns themselves (optional)
+        if (user && user.id === auditorId) continue;
+
+        await this.notificationService.create({
+          userId: auditorId,
+          title: 'Assigned to Audit',
+          message: `You have been assigned to audit '${updatedAudit.auditName}' by ${user?.name || 'an Audit Manager'}.`,
+          type: 'info',
+          link: `/audits/${updatedAudit.id}`
+        });
       }
     }
 
-    // 2. Status Change Notifications
-    if (data.status && data.status !== audit.status) {
+    // Status Change Notifications
+    if (data.status && data.status !== existingAudit.status) {
       const auditLink = `/audits/${updatedAudit.id}`;
       const auditName = updatedAudit.auditName;
 
       // Planned -> Approved: Alert Auditors (Ready to start)
-      if (audit.status === 'Planned' && data.status === 'Approved') {
+      if (existingAudit.status === 'Planned' && data.status === 'Approved') {
         for (const auditor of updatedAudit.assignedAuditors) {
           await this.notificationService.create({
             userId: auditor.id,
@@ -229,7 +252,7 @@ export class AuditService {
       }
 
       // In Progress -> Under Review: Alert Manager
-      if (audit.status === 'In Progress' && data.status === 'Under Review') {
+      if (existingAudit.status === 'In Progress' && data.status === 'Under Review') {
         if (updatedAudit.assignedManagerId) {
           await this.notificationService.create({
             userId: updatedAudit.assignedManagerId,
@@ -241,8 +264,9 @@ export class AuditService {
         }
       }
 
-      // Under Review -> Finalized: Alert CAE
-      if (audit.status === 'Under Review' && data.status === 'Finalized') {
+      // Under Review -> Finalized: Alert CAE and Auditors
+      if (existingAudit.status === 'Under Review' && data.status === 'Finalized') {
+        // Alert CAE
         const caes = await this.prisma.user.findMany({
           where: {
             userRoles: {
@@ -263,6 +287,17 @@ export class AuditService {
             type: 'info',
             link: auditLink
           });
+        }
+
+        // Alert Auditors
+        for (const auditor of updatedAudit.assignedAuditors) {
+            await this.notificationService.create({
+                userId: auditor.id,
+                title: 'Audit Finalized',
+                message: `Audit '${auditName}' has been finalized. Good job!`,
+                type: 'info',
+                link: auditLink
+            });
         }
       }
     }

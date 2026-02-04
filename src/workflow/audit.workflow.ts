@@ -61,7 +61,7 @@ export class AuditWorkflowService {
     let title = '';
     let message = '';
     let type = 'info';
-    let targetUserId = managerId; 
+    const targetUserId = managerId; 
 
     // Logic to determine notification content and recipient
     switch (status) {

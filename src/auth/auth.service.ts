@@ -30,7 +30,7 @@ export class AuthService {
       roles: user.userRoles?.map(ur => ur.role.roleName) || [] 
     };
     
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     const { passwordHash, ...result } = user;
     
     return {

@@ -78,14 +78,14 @@ export class AuditController {
   @Get(':id/programs')
   async getPrograms(@Param('id', ParseIntPipe) id: number) {
     const audit = await this.auditService.findOne(id);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return
+     
     return (audit as any).auditPrograms || [];
   }
 
   @Get(':id/findings')
   async getFindings(@Param('id', ParseIntPipe) id: number) {
     const audit = await this.auditService.findOne(id);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return
+     
     return (audit as any).findings || [];
   }
 
