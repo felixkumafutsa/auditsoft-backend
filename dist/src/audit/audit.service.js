@@ -13,6 +13,7 @@ exports.AuditService = exports.UpdateAuditDto = exports.CreateAuditDto = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const notification_service_1 = require("../notification/notification.service");
+const reports_service_1 = require("../reports/reports.service");
 class CreateAuditDto {
     auditName;
     auditType;
@@ -39,9 +40,11 @@ exports.UpdateAuditDto = UpdateAuditDto;
 let AuditService = class AuditService {
     prisma;
     notificationService;
-    constructor(prisma, notificationService) {
+    reportsService;
+    constructor(prisma, notificationService, reportsService) {
         this.prisma = prisma;
         this.notificationService = notificationService;
+        this.reportsService = reportsService;
     }
     async findAll(user) {
         const where = {
@@ -85,6 +88,16 @@ let AuditService = class AuditService {
             where: { status: 'Template' },
             include: { auditPrograms: true },
             orderBy: { auditName: 'asc' }
+        });
+    }
+    async findForOwner(ownerId) {
+        return this.prisma.audit.findMany({
+            where: {
+                status: { not: 'Template' },
+                auditUniverse: { ownerId },
+            },
+            include: { findings: true, auditPrograms: true, assignedManager: true, assignedAuditors: true, auditUniverse: true },
+            orderBy: { createdAt: 'desc' },
         });
     }
     async create(data, user) {
@@ -247,6 +260,18 @@ let AuditService = class AuditService {
                     });
                 }
             }
+            if (data.status === 'Closed') {
+                await this.reportsService.generatePDFToFile(updatedAudit.id);
+                if (updatedAudit.assignedManagerId) {
+                    await this.notificationService.create({
+                        userId: updatedAudit.assignedManagerId,
+                        title: 'Audit Closed',
+                        message: `Audit '${auditName}' has been closed. Report is ready for review.`,
+                        type: 'info',
+                        link: `/reports/audit/${updatedAudit.id}/preview`
+                    });
+                }
+            }
         }
         return updatedAudit;
     }
@@ -262,6 +287,7 @@ exports.AuditService = AuditService;
 exports.AuditService = AuditService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        notification_service_1.NotificationService])
+        notification_service_1.NotificationService,
+        reports_service_1.ReportsService])
 ], AuditService);
 //# sourceMappingURL=audit.service.js.map

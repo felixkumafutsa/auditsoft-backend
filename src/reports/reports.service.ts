@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import PDFDocument from 'pdfkit';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
 import { Response } from 'express';
 import { NotificationService } from '../notification/notification.service';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class ReportsService {
@@ -199,6 +201,87 @@ export class ReportsService {
     }
   }
 
+  async generatePDFToFile(auditId: number): Promise<string> {
+    const audit = await this.getAuditReportData(auditId);
+    const uploadsDir = path.join(__dirname, '..', '..', 'uploads', 'reports');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    const filePath = path.join(uploadsDir, `Audit_Report_${auditId}.pdf`);
+    const doc = new PDFDocument();
+    const writeStream = fs.createWriteStream(filePath);
+    doc.pipe(writeStream);
+
+    doc.fontSize(20).text(`Audit Report: ${audit.auditName}`, { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).text(`Status: ${audit.status}`);
+    doc.text(`Type: ${audit.auditType}`);
+    doc.text(`Manager: ${audit.assignedManager?.name || 'Unassigned'}`);
+    doc.text(`Dates: ${audit.startDate ? new Date(audit.startDate).toDateString() : 'N/A'} - ${audit.endDate ? new Date(audit.endDate).toDateString() : 'N/A'}`);
+    doc.moveDown();
+    doc.fontSize(16).text('Executive Summary', { underline: true });
+    doc.fontSize(12).text(`This audit identified ${audit.findings.length} findings.`);
+    doc.moveDown();
+    doc.fontSize(16).text('Detailed Findings', { underline: true });
+    audit.findings.forEach((finding, index) => {
+      doc.fontSize(14).text(`${index + 1}. ${finding.description} (${finding.severity})`);
+      doc.fontSize(12).text(`Status: ${finding.status}`);
+      if (finding.rootCause) doc.text(`Root Cause: ${finding.rootCause}`);
+      doc.moveDown();
+    });
+    doc.end();
+
+    await new Promise<void>((resolve, reject) => {
+      writeStream.on('finish', () => resolve());
+      writeStream.on('error', reject);
+    });
+
+    // Notify Manager (review-only) and CAE (download)
+    const recipientsReview = audit.assignedManagerId ? [audit.assignedManagerId] : [];
+    for (const userId of recipientsReview) {
+      await this.notificationService.create({
+        userId,
+        title: 'Audit Report Ready for Review',
+        message: `Audit report for '${audit.auditName}' is ready. View it now.`,
+        type: 'REPORT_READY',
+        link: `/reports/audit/${auditId}/preview`,
+      });
+    }
+    const caes = await this.prisma.user.findMany({
+      where: {
+        userRoles: {
+          some: {
+            role: {
+              roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+            }
+          }
+        }
+      }
+    });
+    for (const cae of caes) {
+      await this.notificationService.create({
+        userId: cae.id,
+        title: 'Audit Report Ready',
+        message: `Audit report for '${audit.auditName}' is ready to download.`,
+        type: 'REPORT_READY',
+        link: `/reports/audit/${auditId}/file`,
+      });
+    }
+
+    return filePath;
+  }
+
+  async streamStoredPDF(auditId: number, res: Response, attachment: boolean) {
+    const filePath = path.join(__dirname, '..', '..', 'uploads', 'reports', `Audit_Report_${auditId}.pdf`);
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('Report file not found. Try regenerating.');
+    }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `${attachment ? 'attachment' : 'inline'}; filename=Audit_Report_${auditId}.pdf`);
+    const stream = fs.createReadStream(filePath);
+    stream.pipe(res);
+  }
+
   async generateWord(auditId: number, res: Response) {
     const audit = await this.getAuditReportData(auditId);
     
@@ -252,5 +335,4 @@ export class ReportsService {
     }
   }
 }
-
 

@@ -23,14 +23,26 @@ export class ReportsController {
   }
 
   @Get('audit/:id/pdf')
-  @Roles('Admin', 'System Administrator', 'Chief Audit Executive', 'CAE', 'Executive', 'Manager', 'Audit Manager', 'Auditor')
+  @Roles('Chief Audit Executive', 'CAE', 'System Administrator')
   async downloadAuditReportPDF(@Param('id') id: string, @Res() res: express.Response) {
     return this.reportsService.generatePDF(+id, res);
   }
 
   @Get('audit/:id/docx')
-  @Roles('Admin', 'System Administrator', 'Chief Audit Executive', 'CAE', 'Executive', 'Manager', 'Audit Manager', 'Auditor')
+  @Roles('Chief Audit Executive', 'CAE', 'System Administrator')
   async downloadAuditReportWord(@Param('id') id: string, @Res() res: express.Response) {
     return this.reportsService.generateWord(+id, res);
+  }
+
+  @Get('audit/:id/preview')
+  @Roles('Manager', 'Audit Manager')
+  async previewAuditReport(@Param('id') id: string, @Res() res: express.Response) {
+    return this.reportsService.streamStoredPDF(+id, res, false);
+  }
+
+  @Get('audit/:id/file')
+  @Roles('Chief Audit Executive', 'CAE', 'System Administrator')
+  async downloadStoredAuditReport(@Param('id') id: string, @Res() res: express.Response) {
+    return this.reportsService.streamStoredPDF(+id, res, true);
   }
 }

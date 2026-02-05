@@ -19,12 +19,13 @@ const audit_approval_service_1 = require("./audit-approval.service");
 const audit_comments_service_1 = require("./audit-comments.service");
 const bulk_audit_service_1 = require("./bulk-audit.service");
 const notification_module_1 = require("../notification/notification.module");
+const reports_module_1 = require("../reports/reports.module");
 let AuditModule = class AuditModule {
 };
 exports.AuditModule = AuditModule;
 exports.AuditModule = AuditModule = __decorate([
     (0, common_1.Module)({
-        imports: [notification_module_1.NotificationModule],
+        imports: [notification_module_1.NotificationModule, reports_module_1.ReportsModule],
         controllers: [audit_controller_1.AuditController, audit_workflow_controller_1.AuditWorkflowController],
         providers: [
             audit_service_1.AuditService,

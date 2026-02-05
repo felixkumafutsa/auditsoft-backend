@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { Audit } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
+import { ReportsService } from '../reports/reports.service';
 
 export class CreateAuditDto {
   auditName: string;
@@ -34,7 +35,8 @@ export class UpdateAuditDto {
 export class AuditService {
   constructor(
     private prisma: PrismaService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private reportsService: ReportsService
   ) {}
 
   async findAll(user?: any): Promise<Audit[]> {
@@ -92,6 +94,17 @@ export class AuditService {
       where: { status: 'Template' },
       include: { auditPrograms: true },
       orderBy: { auditName: 'asc' }
+    });
+  }
+
+  async findForOwner(ownerId: number): Promise<Audit[]> {
+    return this.prisma.audit.findMany({
+      where: {
+        status: { not: 'Template' },
+        auditUniverse: { ownerId },
+      },
+      include: { findings: true, auditPrograms: true, assignedManager: true, assignedAuditors: true, auditUniverse: true },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -298,6 +311,21 @@ export class AuditService {
                 type: 'info',
                 link: auditLink
             });
+        }
+      }
+
+      // Any -> Closed: Generate report and notify
+      if (data.status === 'Closed') {
+        await this.reportsService.generatePDFToFile(updatedAudit.id);
+        // Optional immediate notifications for closure
+        if (updatedAudit.assignedManagerId) {
+          await this.notificationService.create({
+            userId: updatedAudit.assignedManagerId,
+            title: 'Audit Closed',
+            message: `Audit '${auditName}' has been closed. Report is ready for review.`,
+            type: 'info',
+            link: `/reports/audit/${updatedAudit.id}/preview`
+          });
         }
       }
     }

@@ -32,6 +32,13 @@ export class AuditController {
     return this.auditService.findAll(req.user);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('owner')
+  getForOwner(@Req() req: any) {
+    const userId = req.user?.userId ?? req.user?.id;
+    return this.auditService.findForOwner(Number(userId));
+  }
+
   @Get('templates')
   getTemplates() {
     return this.auditService.findTemplates();

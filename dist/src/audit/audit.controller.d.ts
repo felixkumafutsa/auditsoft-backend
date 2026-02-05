@@ -16,6 +16,18 @@ export declare class AuditController {
         assignedManagerId: number | null;
         auditUniverseId: number | null;
     }[]>;
+    getForOwner(req: any): Promise<{
+        id: number;
+        status: string;
+        createdAt: Date;
+        updatedAt: Date;
+        auditName: string;
+        auditType: string;
+        startDate: Date | null;
+        endDate: Date | null;
+        assignedManagerId: number | null;
+        auditUniverseId: number | null;
+    }[]>;
     getTemplates(): Promise<{
         id: number;
         status: string;

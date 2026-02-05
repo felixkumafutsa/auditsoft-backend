@@ -10,9 +10,10 @@ import { AuditApprovalService } from './audit-approval.service';
 import { AuditCommentsService } from './audit-comments.service';
 import { BulkAuditService } from './bulk-audit.service';
 import { NotificationModule } from '../notification/notification.module';
+import { ReportsModule } from '../reports/reports.module';
 
 @Module({
-  imports: [NotificationModule],
+  imports: [NotificationModule, ReportsModule],
   controllers: [AuditController, AuditWorkflowController],
   providers: [
     AuditService,

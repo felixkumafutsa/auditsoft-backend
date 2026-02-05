@@ -5,8 +5,8 @@ export declare class AuditLogController {
     search(filters: any): Promise<{
         id: number;
         userId: number;
-        action: string;
         entityType: string;
+        action: string;
         entityId: number | null;
         timestamp: Date;
         ipAddress: string | null;
