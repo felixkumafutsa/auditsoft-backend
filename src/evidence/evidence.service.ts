@@ -91,6 +91,7 @@ export class EvidenceService {
     const evidence = await this.findOne(id);
     if (!evidence) throw new BadRequestException('Evidence not found');
     const filePath = path.join(process.cwd(), 'uploads', 'evidence', `${evidence.id}-${evidence.fileName}`);
+    console.log('Accessing file at:', filePath);
     return { filePath, fileType: evidence.fileType, fileName: evidence.fileName };
   }
 
