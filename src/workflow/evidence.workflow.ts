@@ -49,15 +49,15 @@ export class EvidenceWorkflowService {
   getPermittedRoles(fromStatus: string, toStatus: string): string[] {
     const transitions: Record<string, Record<string, string[]>> = {
       [EvidenceStatus.UPLOADED]: {
-        [EvidenceStatus.REVIEWED]: ['Auditor', 'Audit Manager'],
-        [EvidenceStatus.ARCHIVED]: ['Audit Manager', 'System Administrator'],
+        [EvidenceStatus.REVIEWED]: ['Audit Manager'],
+        [EvidenceStatus.ARCHIVED]: ['Chief Audit Executive (CAE)'],
       },
       [EvidenceStatus.REVIEWED]: {
-        [EvidenceStatus.APPROVED]: ['Audit Manager', 'Chief Audit Executive (CAE)'],
-        [EvidenceStatus.UPLOADED]: ['Audit Manager'], // Rejection
+        [EvidenceStatus.APPROVED]: ['Chief Audit Executive (CAE)'],
+        [EvidenceStatus.UPLOADED]: ['Audit Manager'],
       },
       [EvidenceStatus.APPROVED]: {
-        [EvidenceStatus.ARCHIVED]: ['System Administrator'],
+        [EvidenceStatus.ARCHIVED]: ['Chief Audit Executive (CAE)'],
       },
     };
 

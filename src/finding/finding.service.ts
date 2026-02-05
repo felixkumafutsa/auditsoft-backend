@@ -179,14 +179,25 @@ export class FindingService {
          }
       }
 
-      // Remediation In Progress -> Verified: Notify Manager
+      // Remediation In Progress -> Verified: Notify CAE to close
       if (currentStatus === 'Remediation In Progress' && toStatus === 'Verified') {
-         if (audit.assignedManagerId) {
+         const caes = await this.prisma.user.findMany({
+           where: {
+             userRoles: {
+               some: {
+                 role: {
+                   roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+                 }
+               }
+             }
+           }
+         });
+         for (const cae of caes) {
            await this.notificationService.create({
-             userId: audit.assignedManagerId,
+             userId: cae.id,
              title: 'Finding Verified',
-             message: `Finding remediation in '${audit.auditName}' has been verified.`,
-             type: 'info',
+             message: `A finding in audit '${audit.auditName}' has been verified. Closing is pending.`,
+             type: 'action_required',
              link
            });
          }

@@ -225,31 +225,120 @@ export class UserService {
   }
 
   async getTasks(userId: number) {
-    await this.findOne(userId);
-
-    // Fetch assigned audits that are in progress
-    const assignedAudits = await this.prisma.audit.findMany({
-      where: {
-        assignedAuditors: {
-          some: { id: userId },
-        },
-        status: 'In Progress',
-      },
-      select: {
-        id: true,
-        auditName: true,
-        endDate: true,
-      },
+    const userRoles = await this.prisma.userRole.findMany({
+      where: { userId },
+      include: { role: true },
     });
+    const roleNames = userRoles.map(ur => ur.role?.roleName);
+    const roleSet = new Set(roleNames);
+    const isManager = roleSet.has('Audit Manager') || roleSet.has('Manager');
+    const isCAE = roleSet.has('Chief Audit Executive') || roleSet.has('Chief Audit Executive (CAE)') || roleSet.has('CAE');
+    const isAuditor = roleSet.has('Auditor');
 
-    // Fetch findings assigned to user that are not closed
-    // Note: Assuming findings might be assigned to a user (not explicitly in schema yet, but logic placeholder)
-    // For now, we'll return audits as tasks
-    return assignedAudits.map(audit => ({
-      id: `audit-${audit.id}`,
-      title: `Execute Audit: ${audit.auditName}`,
-      dueDate: audit.endDate ? audit.endDate.toISOString().split('T')[0] : null,
-      type: 'audit',
-    }));
+    const tasks: any[] = [];
+
+    if (isAuditor) {
+      const assignedAudits = await this.prisma.audit.findMany({
+        where: {
+          assignedAuditors: {
+            some: { id: userId },
+          },
+          status: 'In Progress',
+        },
+        select: {
+          id: true,
+          auditName: true,
+          endDate: true,
+        },
+      });
+      tasks.push(
+        ...assignedAudits.map(audit => ({
+          id: `audit-${audit.id}`,
+          title: `Execute Audit: ${audit.auditName}`,
+          dueDate: audit.endDate ? audit.endDate.toISOString().split('T')[0] : null,
+          type: 'audit',
+          link: `/audits/${audit.id}`,
+        }))
+      );
+    }
+
+    if (isManager) {
+      const evidenceToReview = await this.prisma.evidence.findMany({
+        where: {
+          status: 'Uploaded',
+          auditProgram: {
+            audit: { assignedManagerId: userId },
+          },
+        },
+        select: {
+          uploadedAt: true,
+          auditProgram: {
+            select: { audit: { select: { id: true, auditName: true } } },
+          },
+        },
+        orderBy: { uploadedAt: 'desc' },
+      });
+      const reviewGroups = new Map<number, { auditName: string; count: number; latest: Date | null }>();
+      for (const ev of evidenceToReview) {
+        const auditId = ev.auditProgram.audit.id;
+        const auditName = ev.auditProgram.audit.auditName;
+        const latest = ev.uploadedAt ? new Date(ev.uploadedAt) : null;
+        const existing = reviewGroups.get(auditId);
+        if (existing) {
+          existing.count += 1;
+          if (latest && (!existing.latest || latest > existing.latest)) existing.latest = latest;
+        } else {
+          reviewGroups.set(auditId, { auditName, count: 1, latest });
+        }
+      }
+      for (const [auditId, g] of reviewGroups.entries()) {
+        tasks.push({
+          id: `evidence-review-${auditId}`,
+          title: `Review Evidence: ${g.count} item(s) in '${g.auditName}'`,
+          dueDate: g.latest ? g.latest.toISOString().split('T')[0] : null,
+          type: 'evidence_review',
+          link: `/evidence?audit=${auditId}`,
+        });
+      }
+    }
+
+    if (isCAE) {
+      const evidenceToApprove = await this.prisma.evidence.findMany({
+        where: {
+          status: 'Reviewed',
+        },
+        select: {
+          uploadedAt: true,
+          auditProgram: {
+            select: { audit: { select: { id: true, auditName: true } } },
+          },
+        },
+        orderBy: { uploadedAt: 'desc' },
+      });
+      const approveGroups = new Map<number, { auditName: string; count: number; latest: Date | null }>();
+      for (const ev of evidenceToApprove) {
+        const auditId = ev.auditProgram.audit.id;
+        const auditName = ev.auditProgram.audit.auditName;
+        const latest = ev.uploadedAt ? new Date(ev.uploadedAt) : null;
+        const existing = approveGroups.get(auditId);
+        if (existing) {
+          existing.count += 1;
+          if (latest && (!existing.latest || latest > existing.latest)) existing.latest = latest;
+        } else {
+          approveGroups.set(auditId, { auditName, count: 1, latest });
+        }
+      }
+      for (const [auditId, g] of approveGroups.entries()) {
+        tasks.push({
+          id: `evidence-approval-${auditId}`,
+          title: `Approve Evidence: ${g.count} item(s) in '${g.auditName}'`,
+          dueDate: g.latest ? g.latest.toISOString().split('T')[0] : null,
+          type: 'evidence_approval',
+          link: `/evidence?audit=${auditId}`,
+        });
+      }
+    }
+
+    return tasks;
   }
 }

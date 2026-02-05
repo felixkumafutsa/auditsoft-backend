@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
 import { UserService, CreateUserDto, UpdateUserDto } from './user.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('users')
 export class UserController {
@@ -52,11 +53,8 @@ export class UserController {
   }
 
   @Get('me/tasks')
-  getTasks(@Param('userId') userId: string) {
-    // In a real app, extract userId from JWT token via @User() decorator
-    // For now, hardcoding to 1 or using a query param if needed, 
-    // but the route 'me/tasks' suggests current user.
-    // Let's assume ID 1 for testing if auth not fully wired to params yet.
-    return this.userService.getTasks(1); 
+  @UseGuards(JwtAuthGuard)
+  getTasks(@Request() req) {
+    return this.userService.getTasks(req.user.userId); 
   }
 }

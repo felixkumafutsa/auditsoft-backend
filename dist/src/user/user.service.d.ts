@@ -28,10 +28,5 @@ export declare class UserService {
     assignRole(userId: number, roleId: number): Promise<any>;
     removeRole(userId: number, roleId: number): Promise<void>;
     getUserRoles(userId: number): Promise<any[]>;
-    getTasks(userId: number): Promise<{
-        id: string;
-        title: string;
-        dueDate: string | null;
-        type: string;
-    }[]>;
+    getTasks(userId: number): Promise<any[]>;
 }

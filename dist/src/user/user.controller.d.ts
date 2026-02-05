@@ -46,10 +46,5 @@ export declare class UserController {
     assignRole(userId: number, roleId: number): Promise<any>;
     removeRole(userId: number, roleId: number): Promise<void>;
     getUserRoles(userId: number): Promise<any[]>;
-    getTasks(userId: string): Promise<{
-        id: string;
-        title: string;
-        dueDate: string | null;
-        type: string;
-    }[]>;
+    getTasks(req: any): Promise<any[]>;
 }
