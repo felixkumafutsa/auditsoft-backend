@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuditLogModule = void 0;
 const common_1 = require("@nestjs/common");
 const audit_log_controller_1 = require("./audit-log.controller");
+const audit_log_service_1 = require("./audit-log.service");
 const prisma_service_1 = require("../../prisma/prisma.service");
 let AuditLogModule = class AuditLogModule {
 };
@@ -16,7 +17,8 @@ exports.AuditLogModule = AuditLogModule;
 exports.AuditLogModule = AuditLogModule = __decorate([
     (0, common_1.Module)({
         controllers: [audit_log_controller_1.AuditLogController],
-        providers: [prisma_service_1.PrismaService],
+        providers: [audit_log_service_1.AuditLogService, prisma_service_1.PrismaService],
+        exports: [audit_log_service_1.AuditLogService],
     })
 ], AuditLogModule);
 //# sourceMappingURL=audit-log.module.js.map

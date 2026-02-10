@@ -16,9 +16,12 @@ var AuditStatus;
 (function (AuditStatus) {
     AuditStatus["PLANNED"] = "Planned";
     AuditStatus["APPROVED"] = "Approved";
+    AuditStatus["REJECTED"] = "Rejected";
     AuditStatus["IN_PROGRESS"] = "In Progress";
     AuditStatus["UNDER_REVIEW"] = "Under Review";
+    AuditStatus["EXECUTION_FINISHED"] = "Execution Finished";
     AuditStatus["FINALIZED"] = "Finalized";
+    AuditStatus["PROCESS_OWNER_REVIEW"] = "Process Owner Review";
     AuditStatus["CLOSED"] = "Closed";
 })(AuditStatus || (exports.AuditStatus = AuditStatus = {}));
 let AuditWorkflowService = class AuditWorkflowService {
@@ -27,11 +30,14 @@ let AuditWorkflowService = class AuditWorkflowService {
         this.notificationService = notificationService;
     }
     validTransitions = {
-        [AuditStatus.PLANNED]: [AuditStatus.APPROVED, AuditStatus.CLOSED],
+        [AuditStatus.PLANNED]: [AuditStatus.APPROVED, AuditStatus.REJECTED, AuditStatus.CLOSED],
         [AuditStatus.APPROVED]: [AuditStatus.IN_PROGRESS, AuditStatus.CLOSED],
+        [AuditStatus.REJECTED]: [AuditStatus.PLANNED, AuditStatus.CLOSED],
         [AuditStatus.IN_PROGRESS]: [AuditStatus.UNDER_REVIEW, AuditStatus.CLOSED],
-        [AuditStatus.UNDER_REVIEW]: [AuditStatus.FINALIZED, AuditStatus.IN_PROGRESS],
-        [AuditStatus.FINALIZED]: [AuditStatus.CLOSED],
+        [AuditStatus.UNDER_REVIEW]: [AuditStatus.EXECUTION_FINISHED, AuditStatus.IN_PROGRESS],
+        [AuditStatus.EXECUTION_FINISHED]: [AuditStatus.FINALIZED, AuditStatus.UNDER_REVIEW],
+        [AuditStatus.FINALIZED]: [AuditStatus.PROCESS_OWNER_REVIEW],
+        [AuditStatus.PROCESS_OWNER_REVIEW]: [AuditStatus.CLOSED],
         [AuditStatus.CLOSED]: [],
     };
     canTransition(fromStatus, toStatus) {
@@ -63,6 +69,11 @@ let AuditWorkflowService = class AuditWorkflowService {
                 message = `The audit "${auditName}" has been approved and is ready to start.`;
                 type = 'success';
                 break;
+            case AuditStatus.REJECTED:
+                title = 'Audit Rejected';
+                message = `The audit plan for "${auditName}" has been rejected by the CAE.`;
+                type = 'warning';
+                break;
             case AuditStatus.IN_PROGRESS:
                 title = 'Audit Started';
                 message = `The audit "${auditName}" is now in progress.`;
@@ -70,17 +81,27 @@ let AuditWorkflowService = class AuditWorkflowService {
                 break;
             case AuditStatus.UNDER_REVIEW:
                 title = 'Audit Review Needed';
-                message = `The audit "${auditName}" is ready for review.`;
+                message = `The audit "${auditName}" is ready for manager review.`;
                 type = 'action_required';
+                break;
+            case AuditStatus.EXECUTION_FINISHED:
+                title = 'Audit Execution Finished';
+                message = `The execution for "${auditName}" has been confirmed as finished and is ready for CAE review.`;
+                type = 'info';
                 break;
             case AuditStatus.FINALIZED:
                 title = 'Audit Finalized';
-                message = `The audit "${auditName}" has been finalized.`;
+                message = `The audit "${auditName}" has been finalized by the CAE.`;
                 type = 'success';
+                break;
+            case AuditStatus.PROCESS_OWNER_REVIEW:
+                title = 'Audit Ready for Process Owner Review';
+                message = `The audit "${auditName}" is ready for your review.`;
+                type = 'action_required';
                 break;
             case AuditStatus.CLOSED:
                 title = 'Audit Closed';
-                message = `The audit "${auditName}" has been closed.`;
+                message = `The audit "${auditName}" has been officially closed.`;
                 type = 'warning';
                 break;
         }
@@ -102,23 +123,35 @@ let AuditWorkflowService = class AuditWorkflowService {
     getPermittedRoles(fromStatus, toStatus) {
         const transitions = {
             [AuditStatus.PLANNED]: {
-                [AuditStatus.APPROVED]: ['Chief Audit Executive (CAE)'],
-                [AuditStatus.CLOSED]: ['System Administrator'],
+                [AuditStatus.APPROVED]: ['Chief Audit Executive (CAE)', 'CAE'],
+                [AuditStatus.REJECTED]: ['Chief Audit Executive (CAE)', 'CAE'],
+                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
             },
             [AuditStatus.APPROVED]: {
-                [AuditStatus.IN_PROGRESS]: ['Audit Manager', 'Chief Audit Executive (CAE)'],
-                [AuditStatus.CLOSED]: ['System Administrator'],
+                [AuditStatus.IN_PROGRESS]: ['Auditor'],
+                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
+            },
+            [AuditStatus.REJECTED]: {
+                [AuditStatus.PLANNED]: ['Audit Manager', 'Manager'],
+                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
             },
             [AuditStatus.IN_PROGRESS]: {
-                [AuditStatus.UNDER_REVIEW]: ['Audit Manager', 'Auditor'],
-                [AuditStatus.CLOSED]: ['System Administrator'],
+                [AuditStatus.UNDER_REVIEW]: ['Auditor'],
+                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
             },
             [AuditStatus.UNDER_REVIEW]: {
-                [AuditStatus.FINALIZED]: ['Audit Manager', 'Chief Audit Executive (CAE)'],
-                [AuditStatus.IN_PROGRESS]: ['Audit Manager'],
+                [AuditStatus.EXECUTION_FINISHED]: ['Audit Manager', 'Manager'],
+                [AuditStatus.IN_PROGRESS]: ['Audit Manager', 'Manager'],
+            },
+            [AuditStatus.EXECUTION_FINISHED]: {
+                [AuditStatus.FINALIZED]: ['Chief Audit Executive (CAE)', 'CAE'],
+                [AuditStatus.UNDER_REVIEW]: ['Chief Audit Executive (CAE)', 'CAE'],
             },
             [AuditStatus.FINALIZED]: {
-                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'System Administrator'],
+                [AuditStatus.PROCESS_OWNER_REVIEW]: ['Process Owner', 'ProcessOwner'],
+            },
+            [AuditStatus.PROCESS_OWNER_REVIEW]: {
+                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
             },
         };
         return transitions[fromStatus]?.[toStatus] || [];

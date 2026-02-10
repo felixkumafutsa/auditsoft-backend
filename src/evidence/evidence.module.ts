@@ -5,9 +5,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EvidenceWorkflowService } from '../workflow/evidence.workflow';
 import { AuditModule } from '../audit/audit.module';
 import { NotificationModule } from '../notification/notification.module';
+import { AuditLogModule } from '../audit-log/audit-log.module';
 
 @Module({
-  imports: [AuditModule, NotificationModule],
+  imports: [AuditModule, NotificationModule, AuditLogModule],
   controllers: [EvidenceController],
   providers: [EvidenceService, PrismaService, EvidenceWorkflowService],
   exports: [EvidenceService, EvidenceWorkflowService],

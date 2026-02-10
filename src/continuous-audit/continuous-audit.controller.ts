@@ -32,4 +32,16 @@ export class ContinuousAuditController {
   runControl(@Param('id') id: string) {
     return this.continuousAuditService.runControl(+id);
   }
+
+  @Put('controls/:id')
+  @Roles('Admin', 'System Admin', 'System Administrator', 'CAE', 'Audit Manager', 'Manager')
+  updateControl(@Param('id') id: string, @Body() data: any) {
+    return this.continuousAuditService.updateControl(+id, data);
+  }
+
+  @Delete('controls/:id')
+  @Roles('Admin', 'System Admin', 'System Administrator', 'CAE', 'Audit Manager', 'Manager')
+  deleteControl(@Param('id') id: string) {
+    return this.continuousAuditService.deleteControl(+id);
+  }
 }

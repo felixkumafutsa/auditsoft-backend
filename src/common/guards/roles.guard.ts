@@ -1,3 +1,6 @@
+
+// src/common/decorators/roles.decorator.ts
+import { SetMetadata } from '@nestjs/common';
 // src/common/guards/roles.guard.ts
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -33,8 +36,5 @@ export class RolesGuard implements CanActivate {
     return true;
   }
 }
-
-// src/common/decorators/roles.decorator.ts
-import { SetMetadata } from '@nestjs/common';
 
 export const Roles = (...roles: string[]) => SetMetadata('roles', roles);

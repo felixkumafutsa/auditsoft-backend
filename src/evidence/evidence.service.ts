@@ -7,6 +7,8 @@ import { promises as fs } from 'fs';
 
 import { NotificationService } from '../notification/notification.service';
 
+import { AuditLogService } from '../audit-log/audit-log.service';
+
 @Injectable()
 export class EvidenceService {
   constructor(
@@ -14,12 +16,10 @@ export class EvidenceService {
     private auditService: AuditService,
     private notificationService: NotificationService,
     private workflowService: EvidenceWorkflowService,
+    private auditLogService: AuditLogService,
   ) {}
 
   async create(auditProgramId: number, file: any, description?: string, uploadedById?: number, user?: any) {
-    // In a real application, you would upload the file to S3 or local storage here
-    // and get the URL/path and hash.
-
     if (user) {
       // Find the audit associated with this program
       const auditProgram = await this.prisma.auditProgram.findUnique({
@@ -31,8 +31,11 @@ export class EvidenceService {
         throw new BadRequestException('Invalid Audit Program ID');
       }
 
-      // Verify access to the audit
-      await this.auditService.findOne(auditProgram.auditId, user);
+      // Verify access to the audit and status
+      const audit = await this.auditService.findOne(auditProgram.auditId, user);
+      if (audit.status !== 'In Progress') {
+        throw new BadRequestException(`Evidence can only be uploaded for audits that are 'In Progress'. Current status: ${audit.status}`);
+      }
     }
     
     const created = await this.prisma.evidence.create({
@@ -45,6 +48,14 @@ export class EvidenceService {
         description,
         status: EvidenceStatus.UPLOADED,
       },
+    });
+
+    // Log action
+    await this.auditLogService.logAction({
+      userId: (uploadedById || 1).toString(),
+      action: 'UPLOAD_EVIDENCE',
+      entityType: 'Evidence',
+      entityId: created.id.toString(),
     });
 
     // Persist file to local storage for download/preview
@@ -91,7 +102,6 @@ export class EvidenceService {
     const evidence = await this.findOne(id);
     if (!evidence) throw new BadRequestException('Evidence not found');
     const filePath = path.join(process.cwd(), 'uploads', 'evidence', `${evidence.id}-${evidence.fileName}`);
-    console.log('Accessing file at:', filePath);
     return { filePath, fileType: evidence.fileType, fileName: evidence.fileName };
   }
 
@@ -99,6 +109,21 @@ export class EvidenceService {
     return this.prisma.evidence.findMany({
       where: { auditProgramId },
       include: { uploadedBy: true },
+    });
+  }
+
+  async findAllGlobal(status?: string) {
+    return this.prisma.evidence.findMany({
+      where: status ? { status } : {},
+      include: { 
+        uploadedBy: true,
+        auditProgram: {
+          include: {
+            audit: true
+          }
+        }
+      },
+      orderBy: { uploadedAt: 'desc' }
     });
   }
 
@@ -111,13 +136,92 @@ export class EvidenceService {
   async findOne(id: number) {
     return this.prisma.evidence.findUnique({
       where: { id },
-      include: { uploadedBy: true },
+      include: { 
+        uploadedBy: true,
+        versions: {
+          orderBy: { version: 'desc' },
+          include: { uploadedBy: true }
+        }
+      },
     });
   }
 
-  async updateStatus(id: number, status: string) {
+  async createVersion(id: number, file: any, uploadedById: number, changeDescription?: string) {
+    const evidence = await this.prisma.evidence.findUnique({
+      where: { id },
+    });
+
+    if (!evidence) {
+      throw new BadRequestException('Evidence not found');
+    }
+
+    // Create a new version
+    const newVersionNumber = (await this.prisma.evidenceVersion.count({
+      where: { evidenceId: id }
+    })) + 1;
+
+    const version = await this.prisma.evidenceVersion.create({
+      data: {
+        evidenceId: id,
+        version: newVersionNumber,
+        fileName: file.originalname,
+        fileType: file.mimetype,
+        fileHash: 'dummy_hash_' + Date.now(),
+        uploadedById,
+        description: changeDescription || `Version ${newVersionNumber}`,
+      }
+    });
+
+    // Update the main evidence record to point to the latest file metadata if needed
+    // In this simple implementation, we'll keep the main evidence record as the current version
+    await this.prisma.evidence.update({
+      where: { id },
+      data: {
+        fileName: file.originalname,
+        fileType: file.mimetype,
+        fileHash: version.fileHash,
+        updatedAt: new Date(),
+      }
+    });
+
+    // Persist file
+    try {
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'evidence', 'versions');
+      await fs.mkdir(uploadsDir, { recursive: true });
+      const destPath = path.join(uploadsDir, `${version.id}-${version.fileName}`);
+      if (file?.buffer) {
+        await fs.writeFile(destPath, file.buffer);
+      }
+    } catch (e) {
+      console.error('Failed to persist evidence version file', e);
+    }
+
+    // Log action
+    await this.auditLogService.logAction({
+      userId: uploadedById.toString(),
+      action: 'CREATE_EVIDENCE_VERSION',
+      entityType: 'Evidence',
+      entityId: id.toString(),
+    });
+
+    return version;
+  }
+
+  async updateStatus(id: number, status: string, userId?: number) {
     const evidence = await this.findOne(id);
     if (!evidence) throw new BadRequestException('Evidence not found');
+
+    const auditProgram = await this.prisma.auditProgram.findUnique({
+        where: { id: evidence.auditProgramId },
+        select: { auditId: true }
+    });
+    if (auditProgram?.auditId) {
+        const audit = await this.auditService.findOne(auditProgram.auditId);
+        const allowedAuditStatuses = ['In Progress', 'Under Review', 'Execution Finished', 'Finalized', 'Process Owner Review'];
+        if (!allowedAuditStatuses.includes(audit.status)) {
+            throw new BadRequestException(`Evidence status cannot be changed when audit is in '${audit.status}' status.`);
+        }
+    }
 
     // Validate Transition
     if (!this.workflowService.canTransition(evidence.status, status)) {
@@ -129,6 +233,16 @@ export class EvidenceService {
       data: { status },
       include: { auditProgram: true }
     });
+
+    // Log action
+    if (userId) {
+      await this.auditLogService.logAction({
+        userId: userId.toString(),
+        action: `UPDATE_EVIDENCE_STATUS_${status}`,
+        entityType: 'Evidence',
+        entityId: id.toString(),
+      });
+    }
 
     // Notifications
     try {
@@ -185,12 +299,12 @@ export class EvidenceService {
             }
         }
 
-        // Rejected (Back to Uploaded from Reviewed): Notify Uploader
-        if (evidence.status === EvidenceStatus.REVIEWED && status === EvidenceStatus.UPLOADED) {
+        // Rejected: Notify Uploader
+        if (status === EvidenceStatus.REJECTED) {
              await this.notificationService.create({
                 userId: updatedEvidence.uploadedById,
                 title: 'Evidence Rejected',
-                message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' was rejected/returned.`,
+                message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' was rejected.`,
                 type: 'warning',
                 link
             });

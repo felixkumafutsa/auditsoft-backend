@@ -1,6 +1,7 @@
 export declare enum FindingStatus {
     IDENTIFIED = "Identified",
     VALIDATED = "Validated",
+    REJECTED = "Rejected",
     ACTION_ASSIGNED = "Action Assigned",
     REMEDIATION_IN_PROGRESS = "Remediation In Progress",
     VERIFIED = "Verified",

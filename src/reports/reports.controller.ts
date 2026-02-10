@@ -11,13 +11,19 @@ export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
   @Get('executive')
-  @Roles('Admin', 'System Administrator', 'Chief Audit Executive', 'CAE', 'Executive')
+  @Roles('System Administrator', 'Chief Audit Executive', 'CAE', 'Executive', 'Manager', 'Audit Manager')
   getExecutiveReport() {
     return this.reportsService.getExecutiveReport();
   }
 
+  @Get('operational')
+  @Roles('System Administrator', 'Chief Audit Executive', 'CAE', 'Manager', 'Audit Manager')
+  getOperationalReports() {
+    return this.reportsService.getOperationalReports();
+  }
+
   @Get('dashboard')
-  @Roles('Admin', 'System Administrator', 'Chief Audit Executive', 'CAE', 'Executive', 'Manager', 'Audit Manager', 'Auditor')
+  @Roles('System Administrator', 'Chief Audit Executive', 'CAE', 'Executive', 'Manager', 'Audit Manager', 'Auditor')
   getDashboardStats() {
     return this.reportsService.getDashboardStats();
   }

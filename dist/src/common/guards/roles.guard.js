@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Roles = exports.RolesGuard = void 0;
 const common_1 = require("@nestjs/common");
+const common_2 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
 let RolesGuard = class RolesGuard {
     reflector;
@@ -25,22 +26,21 @@ let RolesGuard = class RolesGuard {
         const request = context.switchToHttp().getRequest();
         const user = request.user;
         if (!user || !user.roles) {
-            throw new common_1.ForbiddenException('User information not found');
+            throw new common_2.ForbiddenException('User information not found');
         }
         const userRoles = Array.isArray(user.roles) ? user.roles : [user.roles];
         const hasRole = () => userRoles.some(role => requiredRoles.includes(role));
         if (!hasRole()) {
-            throw new common_1.ForbiddenException(`User with roles [${userRoles.join(', ')}] does not have access to this resource. Required roles: [${requiredRoles.join(', ')}]`);
+            throw new common_2.ForbiddenException(`User with roles [${userRoles.join(', ')}] does not have access to this resource. Required roles: [${requiredRoles.join(', ')}]`);
         }
         return true;
     }
 };
 exports.RolesGuard = RolesGuard;
 exports.RolesGuard = RolesGuard = __decorate([
-    (0, common_1.Injectable)(),
+    (0, common_2.Injectable)(),
     __metadata("design:paramtypes", [core_1.Reflector])
 ], RolesGuard);
-const common_2 = require("@nestjs/common");
-const Roles = (...roles) => (0, common_2.SetMetadata)('roles', roles);
+const Roles = (...roles) => (0, common_1.SetMetadata)('roles', roles);
 exports.Roles = Roles;
 //# sourceMappingURL=roles.guard.js.map

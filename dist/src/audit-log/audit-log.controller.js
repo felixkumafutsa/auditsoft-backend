@@ -14,23 +14,26 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuditLogController = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("../../prisma/prisma.service");
+const audit_log_service_1 = require("./audit-log.service");
 let AuditLogController = class AuditLogController {
-    prisma;
-    constructor(prisma) {
-        this.prisma = prisma;
+    auditLogService;
+    constructor(auditLogService) {
+        this.auditLogService = auditLogService;
+    }
+    async findAll() {
+        return this.auditLogService.findAll();
     }
     async search(filters) {
-        const limit = filters.limit ? Number(filters.limit) : undefined;
-        return this.prisma.auditLog.findMany({
-            take: limit,
-            orderBy: {
-                timestamp: 'desc',
-            },
-        });
+        return this.auditLogService.findAll();
     }
 };
 exports.AuditLogController = AuditLogController;
+__decorate([
+    (0, common_1.Get)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], AuditLogController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Post)('search'),
     __param(0, (0, common_1.Body)()),
@@ -40,6 +43,6 @@ __decorate([
 ], AuditLogController.prototype, "search", null);
 exports.AuditLogController = AuditLogController = __decorate([
     (0, common_1.Controller)('audit-logs'),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [audit_log_service_1.AuditLogService])
 ], AuditLogController);
 //# sourceMappingURL=audit-log.controller.js.map

@@ -32,4 +32,17 @@ export class ContinuousAuditService {
     console.log(`Manually running control #${controlId}`);
     return { message: 'Control run initiated' };
   }
+
+  async updateControl(id: number, data: any) {
+    return this.prisma.automatedControl.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async deleteControl(id: number) {
+    return this.prisma.automatedControl.delete({
+      where: { id },
+    });
+  }
 }

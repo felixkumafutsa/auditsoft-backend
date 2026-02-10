@@ -17,6 +17,11 @@ export class ActionPlanController {
     return this.actionPlanService.findAll();
   }
 
+  @Get('overdue')
+  findOverdue() {
+    return this.actionPlanService.findOverdue();
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.actionPlanService.findOne(id);

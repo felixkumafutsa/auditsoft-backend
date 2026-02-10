@@ -12,31 +12,31 @@ export class AuditUniverseController {
   constructor(private readonly auditUniverseService: AuditUniverseService) {}
 
   @Post()
-  @Roles('Admin', 'System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)')
+  @Roles('System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)')
   create(@Body() createAuditUniverseDto: CreateAuditUniverseDto) {
     return this.auditUniverseService.create(createAuditUniverseDto);
   }
 
   @Get()
-  @Roles('Admin', 'System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)', 'Auditor', 'Audit Manager', 'Manager')
+  @Roles('System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)', 'Auditor', 'Audit Manager', 'Manager')
   findAll() {
     return this.auditUniverseService.findAll();
   }
 
   @Get(':id')
-  @Roles('Admin', 'System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)', 'Auditor', 'Audit Manager', 'Manager')
+  @Roles('System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)', 'Auditor', 'Audit Manager', 'Manager')
   findOne(@Param('id') id: string) {
     return this.auditUniverseService.findOne(+id);
   }
 
   @Patch(':id')
-  @Roles('Admin', 'System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)')
+  @Roles('System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)')
   update(@Param('id') id: string, @Body() updateAuditUniverseDto: UpdateAuditUniverseDto) {
     return this.auditUniverseService.update(+id, updateAuditUniverseDto);
   }
 
   @Delete(':id')
-  @Roles('Admin', 'System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)')
+  @Roles('System Administrator', 'Chief Audit Executive', 'CAE', 'Chief Audit Executive (CAE)')
   remove(@Param('id') id: string) {
     return this.auditUniverseService.remove(+id);
   }

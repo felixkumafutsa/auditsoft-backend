@@ -81,8 +81,9 @@ let FindingService = class FindingService {
         if (!data.auditId || !data.description || !data.severity) {
             throw new common_1.BadRequestException('auditId, description, and severity are required');
         }
-        if (user) {
-            await this.auditService.findOne(data.auditId, user);
+        const audit = await this.auditService.findOne(data.auditId, user);
+        if (audit.status !== 'In Progress') {
+            throw new common_1.BadRequestException(`Findings can only be created for audits that are 'In Progress'. Current status: ${audit.status}`);
         }
         return this.prisma.finding.create({
             data: {
@@ -120,20 +121,38 @@ let FindingService = class FindingService {
     async transitionStatus(id, toStatus, userRole) {
         const finding = await this.findOne(id);
         const currentStatus = finding.status;
-        if (!this.workflowService.canTransition(currentStatus, toStatus)) {
-            throw new common_1.BadRequestException(`Cannot transition from ${currentStatus} to ${toStatus}`);
+        const normalizedToStatus = toStatus.trim();
+        const normalizedUserRole = userRole?.trim();
+        const audit = await this.auditService.findOne(finding.auditId);
+        const allowedAuditStatuses = ['In Progress', 'Under Review', 'Execution Finished', 'Finalized', 'Process Owner Review'];
+        if (!allowedAuditStatuses.includes(audit.status)) {
+            throw new common_1.BadRequestException(`Finding status cannot be changed when audit is in '${audit.status}' status.`);
         }
-        if (userRole) {
-            const permittedRoles = this.workflowService.getPermittedRoles(currentStatus, toStatus);
-            if (!permittedRoles.includes(userRole)) {
-                throw new common_1.BadRequestException(`Role ${userRole} is not permitted to transition from ${currentStatus} to ${toStatus}`);
+        if (!this.workflowService.canTransition(currentStatus, normalizedToStatus)) {
+            throw new common_1.BadRequestException(`Cannot transition from ${currentStatus} to ${normalizedToStatus}`);
+        }
+        if (normalizedUserRole) {
+            const permittedRoles = this.workflowService.getPermittedRoles(currentStatus, normalizedToStatus);
+            if (!permittedRoles.includes(normalizedUserRole)) {
+                throw new common_1.BadRequestException(`Role ${normalizedUserRole} is not permitted to transition from ${currentStatus} to ${normalizedToStatus}`);
             }
         }
-        const updatedFinding = await this.update(id, { status: toStatus });
+        const updatedFinding = await this.update(id, { status: normalizedToStatus });
         try {
             const audit = await this.auditService.findOne(updatedFinding.auditId);
             const link = `/audits/${updatedFinding.auditId}`;
             const findingTitle = `Finding: ${updatedFinding.description.substring(0, 30)}...`;
+            if (toStatus === 'Rejected') {
+                for (const auditor of audit.assignedAuditors) {
+                    await this.notificationService.create({
+                        userId: auditor.id,
+                        title: 'Finding Rejected',
+                        message: `A finding in audit '${audit.auditName}' was rejected by the manager.`,
+                        type: 'warning',
+                        link
+                    });
+                }
+            }
             if (currentStatus === 'Identified' && toStatus === 'Validated') {
                 if (audit.assignedManagerId) {
                     await this.notificationService.create({
@@ -152,6 +171,15 @@ let FindingService = class FindingService {
                         title: 'Action Plan Assigned',
                         message: `Action plan assigned for finding in '${audit.auditName}'.`,
                         type: 'info',
+                        link
+                    });
+                }
+                if (audit.auditUniverse?.ownerId) {
+                    await this.notificationService.create({
+                        userId: audit.auditUniverse.ownerId,
+                        title: 'Action Plan Required',
+                        message: `A finding in '${audit.auditName}' requires an action plan from you.`,
+                        type: 'action_required',
                         link
                     });
                 }

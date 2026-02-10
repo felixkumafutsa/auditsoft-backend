@@ -16,7 +16,7 @@ const user_module_1 = require("./user/user.module");
 const role_module_1 = require("./role/role.module");
 const auth_module_1 = require("./auth/auth.module");
 const admin_module_1 = require("./admin.module");
-const audit_log_module_1 = require("./audit-log.module");
+const audit_log_module_1 = require("./audit-log/audit-log.module");
 const finding_module_1 = require("./finding/finding.module");
 const audit_program_module_1 = require("./audit-program/audit-program.module");
 const action_plan_module_1 = require("./action-plan/action-plan.module");
@@ -29,6 +29,7 @@ const reports_module_1 = require("./reports/reports.module");
 const audit_universe_module_1 = require("./audit-universe/audit-universe.module");
 const integration_module_1 = require("./integration/integration.module");
 const continuous_audit_module_1 = require("./continuous-audit/continuous-audit.module");
+const workflow_module_1 = require("./workflow/workflow.module");
 const prisma_service_1 = require("../prisma/prisma.service");
 let AppModule = class AppModule {
 };
@@ -48,6 +49,7 @@ exports.AppModule = AppModule = __decorate([
             audit_universe_module_1.AuditUniverseModule,
             integration_module_1.IntegrationModule,
             continuous_audit_module_1.ContinuousAuditModule,
+            workflow_module_1.WorkflowModule,
             user_module_1.UserModule,
             role_module_1.RoleModule,
             auth_module_1.AuthModule,

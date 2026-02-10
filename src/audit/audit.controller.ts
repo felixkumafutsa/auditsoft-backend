@@ -70,10 +70,14 @@ export class AuditController {
 
   @Post(':id/assign')
   @Roles('Audit Manager', 'System Administrator')
-  assignAuditors(
+  async assignAuditors(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { auditorIds: number[] },
   ) {
+    const audit = await this.auditService.findOne(id);
+    if (audit.status !== 'Approved') {
+      throw new BadRequestException('Auditors can only be assigned after the audit plan is Approved.');
+    }
     return this.auditService.update(id, { assignedAuditorIds: body.auditorIds });
   }
 
@@ -106,26 +110,28 @@ export class AuditController {
   ) {
     const audit = await this.auditService.findOne(id);
     const currentStatus = audit.status;
+    const normalizedToStatus = body.toStatus.trim();
+    const normalizedUserRole = body.userRole?.trim();
 
     // Validate transition
-    if (!this.workflowService.canTransition(currentStatus, body.toStatus)) {
+    if (!this.workflowService.canTransition(currentStatus, normalizedToStatus)) {
       throw new BadRequestException(
-        `Cannot transition from ${currentStatus} to ${body.toStatus}`,
+        `Cannot transition from ${currentStatus} to ${normalizedToStatus}`,
       );
     }
 
     // Check role permissions
     const permittedRoles = this.workflowService.getPermittedRoles(
       currentStatus,
-      body.toStatus,
+      normalizedToStatus,
     );
-    if (body.userRole && !permittedRoles.includes(body.userRole)) {
+    if (normalizedUserRole && !permittedRoles.includes(normalizedUserRole)) {
       throw new BadRequestException(
-        `Role ${body.userRole} is not permitted to transition from ${currentStatus} to ${body.toStatus}`,
+        `Role ${normalizedUserRole} is not permitted to transition from ${currentStatus} to ${normalizedToStatus}`,
       );
     }
 
-    return this.auditService.update(id, { status: body.toStatus }, req.user);
+    return this.auditService.update(id, { status: normalizedToStatus }, req.user);
   }
 
   @Get(':id/allowed-transitions')

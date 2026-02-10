@@ -7,7 +7,7 @@ import { UserModule } from './user/user.module';
 import { RoleModule } from './role/role.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin.module';
-import { AuditLogModule } from './audit-log.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
 import { FindingModule } from './finding/finding.module';
 import { AuditProgramModule } from './audit-program/audit-program.module';
 import { ActionPlanModule } from './action-plan/action-plan.module';
@@ -20,6 +20,7 @@ import { ReportsModule } from './reports/reports.module';
 import { AuditUniverseModule } from './audit-universe/audit-universe.module';
 import { IntegrationModule } from './integration/integration.module';
 import { ContinuousAuditModule } from './continuous-audit/continuous-audit.module';
+import { WorkflowModule } from './workflow/workflow.module';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
@@ -36,6 +37,7 @@ import { PrismaService } from '../prisma/prisma.service';
     AuditUniverseModule,
     IntegrationModule,
     ContinuousAuditModule,
+    WorkflowModule,
     UserModule,
     RoleModule,
     AuthModule,

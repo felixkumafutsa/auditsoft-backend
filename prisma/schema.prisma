@@ -30,13 +30,14 @@ model User {
   actionPlanOwner    ActionPlan[]
   uploadedEvidence   Evidence[]
   auditLogActivity   AuditLog[]
-  risksOwned         Risk[]          @relation("RiskOwner")
+  risksOwned         Risk[]            @relation("RiskOwner")
   krisOwned          KRI[]
-  assignedFindings   Finding[]       @relation("FindingAssignee")
+  assignedFindings   Finding[]         @relation("FindingAssignee")
   notifications      Notification[]
   generatedReports   Report[]
-  sentMessages       Message[]       @relation("SentMessages")
-  receivedMessages   Message[]       @relation("ReceivedMessages")
+  sentMessages       Message[]         @relation("SentMessages")
+  receivedMessages   Message[]         @relation("ReceivedMessages")
+  evidenceVersions   EvidenceVersion[]
 }
 
 // ============ MESSAGING ============
@@ -97,7 +98,7 @@ model Audit {
   id                Int       @id @default(autoincrement())
   auditName         String
   auditType         String // Operational / IT / Compliance / Financial
-  status            String    @default("Planned") // Planned / Approved / In Progress / Under Review / Finalized / Closed
+  status            String    @default("Planned") // Planned / Approved / Rejected / In Progress / Under Review / Execution Finished / Finalized / Process Owner Review / Closed
   startDate         DateTime?
   endDate           DateTime?
   assignedManagerId Int?
@@ -158,11 +159,28 @@ model Evidence {
   uploadedAt     DateTime @default(now())
   description    String?
   status         String   @default("active") // Active / Archived
+  currentVersion Int      @default(1)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  auditProgram AuditProgram @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
-  uploadedBy   User         @relation(fields: [uploadedById], references: [id])
+  auditProgram AuditProgram      @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
+  uploadedBy   User              @relation(fields: [uploadedById], references: [id])
+  versions     EvidenceVersion[]
+}
+
+model EvidenceVersion {
+  id           Int      @id @default(autoincrement())
+  evidenceId   Int
+  fileName     String
+  fileType     String
+  fileHash     String
+  uploadedById Int
+  uploadedAt   DateTime @default(now())
+  description  String?
+  version      Int
+
+  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  uploadedBy User     @relation(fields: [uploadedById], references: [id])
 }
 
 // ============ FINDINGS & REMEDIATION ============

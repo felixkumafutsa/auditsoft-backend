@@ -26,7 +26,7 @@ export class AuditProgramController {
   ) {}
 
   @Post()
-  @Roles('Admin', 'Manager', 'Audit Manager', 'CAE', 'Chief Audit Executive (CAE)')
+  @Roles('Manager', 'Audit Manager', 'CAE', 'Chief Audit Executive (CAE)')
   create(@Body() createDto: CreateAuditProgramDto) {
     return this.auditProgramService.create(createDto);
   }
@@ -57,7 +57,7 @@ export class AuditProgramController {
   }
 
   @Delete(':id')
-  @Roles('Admin', 'Manager', 'Audit Manager', 'CAE', 'Chief Audit Executive (CAE)')
+  @Roles('Manager', 'Audit Manager', 'CAE', 'Chief Audit Executive (CAE)')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.auditProgramService.remove(id);
   }

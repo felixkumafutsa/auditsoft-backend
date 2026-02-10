@@ -69,6 +69,45 @@ export class ReportsService {
     };
   }
 
+  async getOperationalReports() {
+    const [auditStats, findingStats, remediationStats] = await Promise.all([
+      this.prisma.audit.groupBy({
+        by: ['status'],
+        _count: { id: true },
+      }),
+      this.prisma.finding.groupBy({
+        by: ['severity', 'status'],
+        _count: { id: true },
+      }),
+      this.prisma.actionPlan.groupBy({
+        by: ['status'],
+        _count: { id: true },
+      }),
+    ]);
+
+    const auditsByMonth = await this.prisma.audit.findMany({
+      select: { createdAt: true },
+      where: {
+        createdAt: {
+          gte: new Date(new Date().setFullYear(new Date().getFullYear() - 1)),
+        },
+      },
+    });
+
+    const monthlyAudits = auditsByMonth.reduce((acc, audit) => {
+      const month = audit.createdAt.toLocaleString('default', { month: 'short' });
+      acc[month] = (acc[month] || 0) + 1;
+      return acc;
+    }, {});
+
+    return {
+      auditsByStatus: auditStats.map(s => ({ status: s.status, count: s._count.id })),
+      findingsBySeverity: findingStats.map(f => ({ severity: f.severity, status: f.status, count: f._count.id })),
+      remediationProgress: remediationStats.map(r => ({ status: r.status, count: r._count.id })),
+      auditVolume: Object.keys(monthlyAudits).map(month => ({ month, count: monthlyAudits[month] })),
+    };
+  }
+
   async getDashboardStats() {
     // Reusing similar logic or expanding for general dashboard
     const [audits, findings, users] = await Promise.all([
@@ -145,6 +184,64 @@ export class ReportsService {
     return audit;
   }
 
+  private async buildPDF(doc: PDFKit.PDFDocument, audit: any) {
+    // Title
+    doc.fontSize(20).text(`Audit Report: ${audit.auditName}`, { align: 'center' });
+    doc.moveDown();
+
+    // Metadata
+    doc.fontSize(14).text('General Information', { underline: true });
+    doc.fontSize(12).text(`Status: ${audit.status}`);
+    doc.text(`Type: ${audit.auditType}`);
+    doc.text(`Business Entity: ${audit.auditUniverse?.entityName || 'N/A'} (${audit.auditUniverse?.entityType || 'N/A'})`);
+    doc.text(`Audit Manager: ${audit.assignedManager?.name || 'Unassigned'}`);
+    
+    const auditors = audit.assignedAuditors?.map(a => a.name).join(', ') || 'Unassigned';
+    doc.text(`Assigned Auditor(s): ${auditors}`);
+    
+    doc.text(`Dates: ${audit.startDate ? new Date(audit.startDate).toDateString() : 'N/A'} - ${audit.endDate ? new Date(audit.endDate).toDateString() : 'N/A'}`);
+    doc.moveDown();
+
+    // Audit Programs
+    doc.fontSize(14).text('Audit Programs', { underline: true });
+    if (audit.auditPrograms && audit.auditPrograms.length > 0) {
+      audit.auditPrograms.forEach((program, index) => {
+        doc.fontSize(12).text(`${index + 1}. ${program.procedureName}`);
+        doc.fontSize(10).text(`   Control Reference: ${program.controlReference || 'N/A'}`);
+        doc.text(`   Expected Outcome: ${program.expectedOutcome || 'N/A'}`);
+        doc.text(`   Actual Result: ${program.actualResult || 'In Progress'}`);
+        doc.moveDown(0.5);
+      });
+    } else {
+      doc.fontSize(12).text('No audit programs defined.');
+    }
+    doc.moveDown();
+
+    // Findings
+    doc.fontSize(14).text('Detailed Findings', { underline: true });
+    if (audit.findings && audit.findings.length > 0) {
+      audit.findings.forEach((finding, index) => {
+        doc.fontSize(12).text(`${index + 1}. ${finding.description} (${finding.severity})`);
+        doc.fontSize(10).text(`   Status: ${finding.status}`);
+        if (finding.rootCause) doc.text(`   Root Cause: ${finding.rootCause}`);
+        doc.moveDown(0.5);
+      });
+    } else {
+      doc.fontSize(12).text('No findings identified.');
+    }
+    doc.moveDown();
+
+    // Evidence
+    doc.fontSize(14).text('Evidence Summary', { underline: true });
+    let totalEvidence = 0;
+    audit.auditPrograms?.forEach(program => {
+      totalEvidence += program.evidence?.length || 0;
+    });
+    doc.fontSize(12).text(`Total Evidence Files Uploaded: ${totalEvidence}`);
+    
+    doc.end();
+  }
+
   async generatePDF(auditId: number, res: Response) {
     const audit = await this.getAuditReportData(auditId);
     const doc = new PDFDocument();
@@ -153,51 +250,25 @@ export class ReportsService {
     res.setHeader('Content-Disposition', `attachment; filename=Audit_Report_${auditId}.pdf`);
 
     doc.pipe(res);
-
-    // Title
-    doc.fontSize(20).text(`Audit Report: ${audit.auditName}`, { align: 'center' });
-    doc.moveDown();
-
-    // Metadata
-    doc.fontSize(12).text(`Status: ${audit.status}`);
-    doc.text(`Type: ${audit.auditType}`);
-    doc.text(`Manager: ${audit.assignedManager?.name || 'Unassigned'}`);
-    doc.text(`Dates: ${audit.startDate ? new Date(audit.startDate).toDateString() : 'N/A'} - ${audit.endDate ? new Date(audit.endDate).toDateString() : 'N/A'}`);
-    doc.moveDown();
-
-    // Executive Summary (Placeholder based on findings)
-    doc.fontSize(16).text('Executive Summary', { underline: true });
-    doc.fontSize(12).text(`This audit identified ${audit.findings.length} findings.`);
-    doc.moveDown();
-
-    // Findings
-    doc.fontSize(16).text('Detailed Findings', { underline: true });
-    audit.findings.forEach((finding, index) => {
-        doc.fontSize(14).text(`${index + 1}. ${finding.description} (${finding.severity})`);
-        doc.fontSize(12).text(`Status: ${finding.status}`);
-        if (finding.rootCause) doc.text(`Root Cause: ${finding.rootCause}`);
-        doc.moveDown();
-    });
-
-    doc.end();
+    await this.buildPDF(doc, audit);
 
     // Notify relevant users (Manager and Auditors)
     const recipients = [
-        ...(audit.assignedManagerId ? [audit.assignedManagerId] : []),
-        ...audit.assignedAuditors.map(a => a.id)
+      ...(audit.assignedManagerId ? [audit.assignedManagerId] : []),
+      ...audit.assignedAuditors.map(a => a.id)
     ];
 
     // Remove duplicates
     const uniqueRecipients = [...new Set(recipients)];
 
     for (const userId of uniqueRecipients) {
-        await this.notificationService.create({
-            userId,
-            title: 'Report Generated',
-            message: `New Audit Report generated for ${audit.auditName}. You can download it now.`,
-            type: 'REPORT_GENERATED',
-            link: `/reports/audit/${auditId}/pdf` // Or a frontend link to view
-        });
+      await this.notificationService.create({
+        userId,
+        title: 'Report Generated',
+        message: `New Audit Report generated for ${audit.auditName}. You can download it now.`,
+        type: 'REPORT_GENERATED',
+        link: `/reports/audit/${auditId}/pdf` 
+      });
     }
   }
 
@@ -212,24 +283,7 @@ export class ReportsService {
     const writeStream = fs.createWriteStream(filePath);
     doc.pipe(writeStream);
 
-    doc.fontSize(20).text(`Audit Report: ${audit.auditName}`, { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(12).text(`Status: ${audit.status}`);
-    doc.text(`Type: ${audit.auditType}`);
-    doc.text(`Manager: ${audit.assignedManager?.name || 'Unassigned'}`);
-    doc.text(`Dates: ${audit.startDate ? new Date(audit.startDate).toDateString() : 'N/A'} - ${audit.endDate ? new Date(audit.endDate).toDateString() : 'N/A'}`);
-    doc.moveDown();
-    doc.fontSize(16).text('Executive Summary', { underline: true });
-    doc.fontSize(12).text(`This audit identified ${audit.findings.length} findings.`);
-    doc.moveDown();
-    doc.fontSize(16).text('Detailed Findings', { underline: true });
-    audit.findings.forEach((finding, index) => {
-      doc.fontSize(14).text(`${index + 1}. ${finding.description} (${finding.severity})`);
-      doc.fontSize(12).text(`Status: ${finding.status}`);
-      if (finding.rootCause) doc.text(`Root Cause: ${finding.rootCause}`);
-      doc.moveDown();
-    });
-    doc.end();
+    await this.buildPDF(doc, audit);
 
     await new Promise<void>((resolve, reject) => {
       writeStream.on('finish', () => resolve());

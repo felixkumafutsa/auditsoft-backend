@@ -13,8 +13,23 @@ export class ActionPlanService {
         findingId: createDto.findingId,
         description: createDto.description,
         ownerId: createDto.ownerId,
-        dueDate: createDto.dueDate,
+        // Only set dueDate if provided to avoid passing undefined into Date()
+        dueDate: createDto.dueDate ? new Date(createDto.dueDate) : undefined,
         status: createDto.status || 'Open',
+      },
+      include: { owner: true, finding: true },
+    });
+  }
+
+  async findOverdue() {
+    return this.prisma.actionPlan.findMany({
+      where: {
+        dueDate: {
+          lt: new Date(),
+        },
+        status: {
+          notIn: ['Closed', 'Verified'],
+        },
       },
       include: { owner: true, finding: true },
     });

@@ -4,6 +4,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 export enum FindingStatus {
   IDENTIFIED = 'Identified',
   VALIDATED = 'Validated',
+  REJECTED = 'Rejected',
   ACTION_ASSIGNED = 'Action Assigned',
   REMEDIATION_IN_PROGRESS = 'Remediation In Progress',
   VERIFIED = 'Verified',
@@ -20,11 +21,12 @@ export enum FindingSeverity {
 @Injectable()
 export class FindingWorkflowService {
   private readonly validTransitions: Record<FindingStatus, FindingStatus[]> = {
-    [FindingStatus.IDENTIFIED]: [FindingStatus.VALIDATED, FindingStatus.CLOSED],
-    [FindingStatus.VALIDATED]: [FindingStatus.ACTION_ASSIGNED, FindingStatus.CLOSED],
-    [FindingStatus.ACTION_ASSIGNED]: [FindingStatus.REMEDIATION_IN_PROGRESS, FindingStatus.CLOSED],
-    [FindingStatus.REMEDIATION_IN_PROGRESS]: [FindingStatus.VERIFIED, FindingStatus.ACTION_ASSIGNED],
-    [FindingStatus.VERIFIED]: [FindingStatus.CLOSED],
+    [FindingStatus.IDENTIFIED]: [FindingStatus.VALIDATED, FindingStatus.REJECTED],
+    [FindingStatus.VALIDATED]: [FindingStatus.ACTION_ASSIGNED, FindingStatus.REJECTED],
+    [FindingStatus.REJECTED]: [FindingStatus.IDENTIFIED],
+    [FindingStatus.ACTION_ASSIGNED]: [FindingStatus.REMEDIATION_IN_PROGRESS],
+    [FindingStatus.REMEDIATION_IN_PROGRESS]: [FindingStatus.CLOSED, FindingStatus.VERIFIED],
+    [FindingStatus.VERIFIED]: [FindingStatus.CLOSED, FindingStatus.REMEDIATION_IN_PROGRESS],
     [FindingStatus.CLOSED]: [], // Terminal state
   };
 
@@ -61,23 +63,25 @@ export class FindingWorkflowService {
   getPermittedRoles(fromStatus: string, toStatus: string): string[] {
     const transitions: Record<string, Record<string, string[]>> = {
       [FindingStatus.IDENTIFIED]: {
-        [FindingStatus.VALIDATED]: ['Auditor'],
-        [FindingStatus.CLOSED]: ['System Administrator'],
+        [FindingStatus.VALIDATED]: ['Audit Manager', 'Manager'],
+        [FindingStatus.REJECTED]: ['Audit Manager', 'Manager'],
       },
       [FindingStatus.VALIDATED]: {
-        [FindingStatus.ACTION_ASSIGNED]: ['Audit Manager'],
-        [FindingStatus.CLOSED]: ['System Administrator'],
+        [FindingStatus.ACTION_ASSIGNED]: ['Chief Audit Executive (CAE)', 'CAE'],
+        [FindingStatus.REJECTED]: ['Chief Audit Executive (CAE)', 'CAE'],
+      },
+      [FindingStatus.REJECTED]: {
+        [FindingStatus.IDENTIFIED]: ['Auditor'],
       },
       [FindingStatus.ACTION_ASSIGNED]: {
-        [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Process Owner', 'Audit Manager'],
-        [FindingStatus.CLOSED]: ['System Administrator'],
+        [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Process Owner', 'ProcessOwner'],
       },
       [FindingStatus.REMEDIATION_IN_PROGRESS]: {
-        [FindingStatus.VERIFIED]: ['Chief Audit Executive (CAE)'],
-        [FindingStatus.ACTION_ASSIGNED]: ['Audit Manager'],
+        [FindingStatus.VERIFIED]: ['Audit Manager', 'Manager'],
+        [FindingStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
       },
       [FindingStatus.VERIFIED]: {
-        [FindingStatus.CLOSED]: ['Chief Audit Executive (CAE)'],
+        [FindingStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
       },
     };
 

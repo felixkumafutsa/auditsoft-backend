@@ -53,7 +53,11 @@ let AuditController = class AuditController {
         }
         return this.auditService.update(id, body);
     }
-    assignAuditors(id, body) {
+    async assignAuditors(id, body) {
+        const audit = await this.auditService.findOne(id);
+        if (audit.status !== 'Approved') {
+            throw new common_1.BadRequestException('Auditors can only be assigned after the audit plan is Approved.');
+        }
         return this.auditService.update(id, { assignedAuditorIds: body.auditorIds });
     }
     delete(id) {
@@ -70,14 +74,16 @@ let AuditController = class AuditController {
     async transitionStatus(id, body, req) {
         const audit = await this.auditService.findOne(id);
         const currentStatus = audit.status;
-        if (!this.workflowService.canTransition(currentStatus, body.toStatus)) {
-            throw new common_1.BadRequestException(`Cannot transition from ${currentStatus} to ${body.toStatus}`);
+        const normalizedToStatus = body.toStatus.trim();
+        const normalizedUserRole = body.userRole?.trim();
+        if (!this.workflowService.canTransition(currentStatus, normalizedToStatus)) {
+            throw new common_1.BadRequestException(`Cannot transition from ${currentStatus} to ${normalizedToStatus}`);
         }
-        const permittedRoles = this.workflowService.getPermittedRoles(currentStatus, body.toStatus);
-        if (body.userRole && !permittedRoles.includes(body.userRole)) {
-            throw new common_1.BadRequestException(`Role ${body.userRole} is not permitted to transition from ${currentStatus} to ${body.toStatus}`);
+        const permittedRoles = this.workflowService.getPermittedRoles(currentStatus, normalizedToStatus);
+        if (normalizedUserRole && !permittedRoles.includes(normalizedUserRole)) {
+            throw new common_1.BadRequestException(`Role ${normalizedUserRole} is not permitted to transition from ${currentStatus} to ${normalizedToStatus}`);
         }
-        return this.auditService.update(id, { status: body.toStatus }, req.user);
+        return this.auditService.update(id, { status: normalizedToStatus }, req.user);
     }
     getAllowedTransitions(id) {
         return this.auditService.findOne(id).then((audit) => ({
@@ -140,7 +146,7 @@ __decorate([
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], AuditController.prototype, "assignAuditors", null);
 __decorate([
     (0, common_1.Delete)(':id'),

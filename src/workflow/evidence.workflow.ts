@@ -3,6 +3,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 export enum EvidenceStatus {
   UPLOADED = 'Uploaded',
   REVIEWED = 'Reviewed',
+  REJECTED = 'Rejected',
   APPROVED = 'Approved',
   ARCHIVED = 'Archived',
 }
@@ -10,8 +11,9 @@ export enum EvidenceStatus {
 @Injectable()
 export class EvidenceWorkflowService {
   private readonly validTransitions: Record<EvidenceStatus, EvidenceStatus[]> = {
-    [EvidenceStatus.UPLOADED]: [EvidenceStatus.REVIEWED, EvidenceStatus.ARCHIVED],
-    [EvidenceStatus.REVIEWED]: [EvidenceStatus.APPROVED, EvidenceStatus.UPLOADED], // Back to uploaded if rejected? Or just Approved.
+    [EvidenceStatus.UPLOADED]: [EvidenceStatus.REVIEWED, EvidenceStatus.REJECTED, EvidenceStatus.ARCHIVED],
+    [EvidenceStatus.REVIEWED]: [EvidenceStatus.APPROVED, EvidenceStatus.REJECTED, EvidenceStatus.UPLOADED],
+    [EvidenceStatus.REJECTED]: [EvidenceStatus.UPLOADED], // Re-upload after rejection
     [EvidenceStatus.APPROVED]: [EvidenceStatus.ARCHIVED],
     [EvidenceStatus.ARCHIVED]: [], // Terminal state
   };
@@ -49,15 +51,18 @@ export class EvidenceWorkflowService {
   getPermittedRoles(fromStatus: string, toStatus: string): string[] {
     const transitions: Record<string, Record<string, string[]>> = {
       [EvidenceStatus.UPLOADED]: {
-        [EvidenceStatus.REVIEWED]: ['Audit Manager'],
-        [EvidenceStatus.ARCHIVED]: ['Chief Audit Executive (CAE)'],
+        [EvidenceStatus.REVIEWED]: ['Audit Manager', 'Manager', 'Admin'],
+        [EvidenceStatus.REJECTED]: ['Audit Manager', 'Manager', 'Admin'],
       },
       [EvidenceStatus.REVIEWED]: {
-        [EvidenceStatus.APPROVED]: ['Chief Audit Executive (CAE)'],
-        [EvidenceStatus.UPLOADED]: ['Audit Manager'],
+        [EvidenceStatus.APPROVED]: ['Chief Audit Executive (CAE)', 'CAE', 'Admin'],
+        [EvidenceStatus.REJECTED]: ['Chief Audit Executive (CAE)', 'CAE', 'Admin'],
+      },
+      [EvidenceStatus.REJECTED]: {
+        [EvidenceStatus.UPLOADED]: ['Auditor'],
       },
       [EvidenceStatus.APPROVED]: {
-        [EvidenceStatus.ARCHIVED]: ['Chief Audit Executive (CAE)'],
+        [EvidenceStatus.ARCHIVED]: ['Chief Audit Executive (CAE)', 'CAE', 'Admin'],
       },
     };
 

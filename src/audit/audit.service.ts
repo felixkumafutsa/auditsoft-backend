@@ -223,7 +223,17 @@ export class AuditService {
     const updatedAudit = await this.prisma.audit.update({
       where: { id },
       data: updateData,
-      include: { findings: true, auditPrograms: true, assignedAuditors: true, assignedManager: true },
+      include: { 
+        findings: true, 
+        auditPrograms: true, 
+        assignedAuditors: true, 
+        assignedManager: true,
+        auditUniverse: {
+          include: {
+            owner: true
+          }
+        }
+      },
     });
 
     // Notify Auditors if assigned (New Assignments only)
@@ -264,6 +274,19 @@ export class AuditService {
         }
       }
 
+      // Planned -> Rejected: Alert Manager
+      if (existingAudit.status === 'Planned' && data.status === 'Rejected') {
+        if (updatedAudit.assignedManagerId) {
+          await this.notificationService.create({
+            userId: updatedAudit.assignedManagerId,
+            title: 'Audit Plan Rejected',
+            message: `The audit plan for '${auditName}' has been rejected by the CAE.`,
+            type: 'warning',
+            link: auditLink
+          });
+        }
+      }
+
       // In Progress -> Under Review: Alert Manager
       if (existingAudit.status === 'In Progress' && data.status === 'Under Review') {
         if (updatedAudit.assignedManagerId) {
@@ -277,9 +300,8 @@ export class AuditService {
         }
       }
 
-      // Under Review -> Finalized: Alert CAE and Auditors
-      if (existingAudit.status === 'Under Review' && data.status === 'Finalized') {
-        // Alert CAE
+      // Under Review -> Execution Finished: Alert CAE
+      if (existingAudit.status === 'Under Review' && data.status === 'Execution Finished') {
         const caes = await this.prisma.user.findMany({
           where: {
             userRoles: {
@@ -295,36 +317,73 @@ export class AuditService {
         for (const cae of caes) {
           await this.notificationService.create({
             userId: cae.id,
-            title: 'Audit Finalized',
-            message: `Audit '${auditName}' has been finalized.`,
+            title: 'Audit Execution Finished',
+            message: `Execution for audit '${auditName}' has been confirmed finished by the manager and is ready for your finalization.`,
+            type: 'action_required',
+            link: auditLink
+          });
+        }
+      }
+
+      // Execution Finished -> Finalized: Alert Process Owner
+      if (existingAudit.status === 'Execution Finished' && data.status === 'Finalized') {
+        if (updatedAudit.auditUniverse?.ownerId) {
+          await this.notificationService.create({
+            userId: updatedAudit.auditUniverse.ownerId,
+            title: 'Audit Finalized - Ready for Review',
+            message: `The audit '${auditName}' has been finalized and is ready for your review.`,
+            type: 'action_required',
+            link: auditLink
+          });
+        }
+      }
+
+      // Finalized -> Process Owner Review: Alert CAE
+      if (existingAudit.status === 'Finalized' && data.status === 'Process Owner Review') {
+        const caes = await this.prisma.user.findMany({
+          where: {
+            userRoles: {
+              some: {
+                role: {
+                  roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+                }
+              }
+            }
+          }
+        });
+        
+        for (const cae of caes) {
+          await this.notificationService.create({
+            userId: cae.id,
+            title: 'Process Owner Reviewed Audit',
+            message: `The process owner has reviewed audit '${auditName}'. You can now close the audit.`,
             type: 'info',
             link: auditLink
           });
         }
-
-        // Alert Auditors
-        for (const auditor of updatedAudit.assignedAuditors) {
-            await this.notificationService.create({
-                userId: auditor.id,
-                title: 'Audit Finalized',
-                message: `Audit '${auditName}' has been finalized. Good job!`,
-                type: 'info',
-                link: auditLink
-            });
-        }
       }
 
-      // Any -> Closed: Generate report and notify
+      // Process Owner Review -> Closed: Generate report and notify
       if (data.status === 'Closed') {
         await this.reportsService.generatePDFToFile(updatedAudit.id);
-        // Optional immediate notifications for closure
+        
         if (updatedAudit.assignedManagerId) {
           await this.notificationService.create({
             userId: updatedAudit.assignedManagerId,
             title: 'Audit Closed',
-            message: `Audit '${auditName}' has been closed. Report is ready for review.`,
-            type: 'info',
+            message: `Audit '${auditName}' has been officially closed. The final report is ready.`,
+            type: 'success',
             link: `/reports/audit/${updatedAudit.id}/preview`
+          });
+        }
+
+        for (const auditor of updatedAudit.assignedAuditors) {
+          await this.notificationService.create({
+            userId: auditor.id,
+            title: 'Audit Closed',
+            message: `Audit '${auditName}' has been officially closed.`,
+            type: 'info',
+            link: auditLink
           });
         }
       }

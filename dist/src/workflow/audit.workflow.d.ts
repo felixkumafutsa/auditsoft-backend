@@ -2,9 +2,12 @@ import { NotificationService } from '../notification/notification.service';
 export declare enum AuditStatus {
     PLANNED = "Planned",
     APPROVED = "Approved",
+    REJECTED = "Rejected",
     IN_PROGRESS = "In Progress",
     UNDER_REVIEW = "Under Review",
+    EXECUTION_FINISHED = "Execution Finished",
     FINALIZED = "Finalized",
+    PROCESS_OWNER_REVIEW = "Process Owner Review",
     CLOSED = "Closed"
 }
 export declare class AuditWorkflowService {

@@ -1,19 +1,17 @@
-import { Controller, Post, Body } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Controller, Post, Body, Get } from '@nestjs/common';
+import { AuditLogService } from './audit-log.service';
 
 @Controller('audit-logs')
 export class AuditLogController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly auditLogService: AuditLogService) {}
+
+  @Get()
+  async findAll() {
+    return this.auditLogService.findAll();
+  }
 
   @Post('search')
   async search(@Body() filters: any) {
-    const limit = filters.limit ? Number(filters.limit) : undefined;
-    
-    return this.prisma.auditLog.findMany({
-      take: limit,
-      orderBy: {
-        timestamp: 'desc',
-      },
-    });
+    return this.auditLogService.findAll();
   }
 }
