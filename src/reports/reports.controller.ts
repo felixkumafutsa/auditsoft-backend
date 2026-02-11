@@ -11,43 +11,43 @@ export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
   @Get('executive')
-  @Roles('Chief Audit Executive (CAE)', 'CAE', 'Executive', 'Manager', 'Audit Manager')
+  @Roles('System Administrator', 'Chief Audit Executive (CAE)', 'Executive', 'Manager', 'Audit Manager')
   getExecutiveReport() {
     return this.reportsService.getExecutiveReport();
   }
 
   @Get('operational')
-  @Roles('Chief Audit Executive (CAE)', 'CAE', 'Manager', 'Audit Manager')
+  @Roles('System Administrator', 'Chief Audit Executive (CAE)', 'Manager', 'Audit Manager')
   getOperationalReports() {
     return this.reportsService.getOperationalReports();
   }
 
   @Get('dashboard')
-  @Roles('Chief Audit Executive (CAE)', 'CAE', 'Executive', 'Manager', 'Audit Manager', 'Auditor')
+  @Roles('System Administrator', 'Chief Audit Executive (CAE)', 'Executive', 'Manager', 'Audit Manager', 'Auditor')
   getDashboardStats() {
     return this.reportsService.getDashboardStats();
   }
 
   @Get('audit/:id/pdf')
-  @Roles('Chief Audit Executive (CAE)', 'CAE')
+  @Roles('Chief Audit Executive (CAE)', 'System Administrator')
   async downloadAuditReportPDF(@Param('id') id: string, @Res() res: express.Response) {
     return this.reportsService.generatePDF(+id, res);
   }
 
   @Get('audit/:id/docx')
-  @Roles('Chief Audit Executive (CAE)', 'CAE')
+  @Roles('Chief Audit Executive (CAE)', 'System Administrator')
   async downloadAuditReportWord(@Param('id') id: string, @Res() res: express.Response) {
     return this.reportsService.generateWord(+id, res);
   }
 
   @Get('audit/:id/preview')
-  @Roles('Chief Audit Executive (CAE)', 'CAE', 'Manager', 'Audit Manager')
+  @Roles('Manager', 'Audit Manager', 'Chief Audit Executive (CAE)')
   async previewAuditReport(@Param('id') id: string, @Res() res: express.Response) {
     return this.reportsService.streamStoredPDF(+id, res, false);
   }
 
   @Get('audit/:id/file')
-  @Roles('Chief Audit Executive (CAE)',  'Manager', 'Audit Manager')
+  @Roles('Chief Audit Executive (CAE)', 'System Administrator')
   async downloadStoredAuditReport(@Param('id') id: string, @Res() res: express.Response) {
     return this.reportsService.streamStoredPDF(+id, res, true);
   }
