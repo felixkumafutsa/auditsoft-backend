@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Res, UseGuards, Request } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -8,7 +8,7 @@ import * as express from 'express';
 @Controller('reports')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(private readonly reportsService: ReportsService) { }
 
   @Get('executive')
   @Roles('System Administrator', 'Chief Audit Executive (CAE)', 'Executive', 'Manager', 'Audit Manager')
@@ -26,6 +26,12 @@ export class ReportsController {
   @Roles('System Administrator', 'Chief Audit Executive (CAE)', 'Executive', 'Manager', 'Audit Manager', 'Auditor')
   getDashboardStats() {
     return this.reportsService.getDashboardStats();
+  }
+
+  @Get('list')
+  @Roles('Audit Manager', 'Chief Audit Executive (CAE)', 'System Administrator')
+  async getReportsList(@Param() params, @Request() req) {
+    return this.reportsService.getReportsList(req?.user);
   }
 
   @Get('audit/:id/pdf')

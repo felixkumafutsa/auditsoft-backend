@@ -156,6 +156,43 @@ export class ReportsService {
     };
   }
 
+  async getReportsList(user: any) {
+    // Audit Managers see reports for audits they manage or all if they are generic managers (depending on business rule, assuming all for now or restricted)
+    // CAE sees all.
+    // For simplicity based on prompt "available to audit manager and the Chief Auditor Executive", we return all reports for closed audits.
+    // We can add filtering if needed later.
+
+    const reports = await this.prisma.report.findMany({
+      where: {
+        audit: {
+          status: 'Closed'
+        }
+      },
+      include: {
+        audit: {
+           select: { auditName: true }
+        },
+        generator: {
+          select: { name: true }
+        }
+      },
+      orderBy: {
+        generatedAt: 'desc'
+      }
+    });
+
+    return reports.map(report => ({
+        id: report.id,
+        auditId: report.auditId,
+        title: report.title,
+        auditName: report.audit.auditName,
+        generatedBy: report.generator.name,
+        generatedAt: report.generatedAt,
+        fileUrl: report.fileUrl,
+        fileType: report.fileType
+    }));
+  }
+
   async getAuditReportData(auditId: number) {
     const audit = await this.prisma.audit.findUnique({      where: { id: auditId },
       include: {
