@@ -46,19 +46,26 @@ export class AuditService {
     
     // Role-based filtering
     if (user) {
-      // Check if user has Auditor role
-      // user.roles is an array of strings like ['Auditor'] coming from JWT
       const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
       const isAuditor = roles.includes('Auditor');
+      const isProcessOwner = roles.includes('Process Owner');
       
       if (isAuditor) {
         where.assignedAuditors = { some: { id: user.id } };
+      } else if (isProcessOwner) {
+        where.auditUniverse = { ownerId: user.id };
       }
     }
 
     return this.prisma.audit.findMany({ 
       where,
-      include: { findings: true, auditPrograms: true, assignedManager: true, assignedAuditors: true },
+      include: { 
+        findings: true, 
+        auditPrograms: true, 
+        assignedManager: true, 
+        assignedAuditors: true,
+        auditUniverse: true
+      },
       orderBy: { createdAt: 'desc' }
     });
   }

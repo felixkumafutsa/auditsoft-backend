@@ -53,13 +53,23 @@ let AuditService = class AuditService {
         if (user) {
             const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
             const isAuditor = roles.includes('Auditor');
+            const isProcessOwner = roles.includes('Process Owner');
             if (isAuditor) {
                 where.assignedAuditors = { some: { id: user.id } };
+            }
+            else if (isProcessOwner) {
+                where.auditUniverse = { ownerId: user.id };
             }
         }
         return this.prisma.audit.findMany({
             where,
-            include: { findings: true, auditPrograms: true, assignedManager: true, assignedAuditors: true },
+            include: {
+                findings: true,
+                auditPrograms: true,
+                assignedManager: true,
+                assignedAuditors: true,
+                auditUniverse: true
+            },
             orderBy: { createdAt: 'desc' }
         });
     }

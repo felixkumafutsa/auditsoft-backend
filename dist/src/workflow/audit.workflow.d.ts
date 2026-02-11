@@ -8,6 +8,7 @@ export declare enum AuditStatus {
     EXECUTION_FINISHED = "Execution Finished",
     FINALIZED = "Finalized",
     PROCESS_OWNER_REVIEW = "Process Owner Review",
+    REVIEWED_BY_OWNER = "Reviewed by Owner",
     CLOSED = "Closed"
 }
 export declare class AuditWorkflowService {

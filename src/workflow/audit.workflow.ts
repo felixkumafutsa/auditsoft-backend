@@ -12,6 +12,7 @@ export enum AuditStatus {
   EXECUTION_FINISHED = 'Execution Finished',
   FINALIZED = 'Finalized',
   PROCESS_OWNER_REVIEW = 'Process Owner Review',
+  REVIEWED_BY_OWNER = 'Reviewed by Owner',
   CLOSED = 'Closed',
 }
 
@@ -27,8 +28,9 @@ export class AuditWorkflowService {
     [AuditStatus.IN_PROGRESS]: [AuditStatus.UNDER_REVIEW, AuditStatus.CLOSED],
     [AuditStatus.UNDER_REVIEW]: [AuditStatus.EXECUTION_FINISHED, AuditStatus.IN_PROGRESS],
     [AuditStatus.EXECUTION_FINISHED]: [AuditStatus.FINALIZED, AuditStatus.UNDER_REVIEW],
-    [AuditStatus.FINALIZED]: [AuditStatus.PROCESS_OWNER_REVIEW],
-    [AuditStatus.PROCESS_OWNER_REVIEW]: [AuditStatus.CLOSED],
+    [AuditStatus.FINALIZED]: [AuditStatus.PROCESS_OWNER_REVIEW, AuditStatus.CLOSED],
+    [AuditStatus.PROCESS_OWNER_REVIEW]: [AuditStatus.REVIEWED_BY_OWNER, AuditStatus.CLOSED],
+    [AuditStatus.REVIEWED_BY_OWNER]: [AuditStatus.CLOSED],
     [AuditStatus.CLOSED]: [], // Terminal state
   };
 
@@ -106,6 +108,11 @@ export class AuditWorkflowService {
         message = `The audit "${auditName}" is ready for your review.`;
         type = 'action_required';
         break;
+      case AuditStatus.REVIEWED_BY_OWNER:
+        title = 'Audit Reviewed by Process Owner';
+        message = `The audit "${auditName}" has been reviewed by the process owner and is ready for closure.`;
+        type = 'success';
+        break;
       case AuditStatus.CLOSED:
         title = 'Audit Closed';
         message = `The audit "${auditName}" has been officially closed.`;
@@ -162,11 +169,17 @@ export class AuditWorkflowService {
       [AuditStatus.EXECUTION_FINISHED]: {
         [AuditStatus.FINALIZED]: ['Chief Audit Executive (CAE)', 'CAE'],
         [AuditStatus.UNDER_REVIEW]: ['Chief Audit Executive (CAE)', 'CAE'],
+        [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
       },
       [AuditStatus.FINALIZED]: {
         [AuditStatus.PROCESS_OWNER_REVIEW]: ['Process Owner', 'ProcessOwner'],
+        [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
       },
       [AuditStatus.PROCESS_OWNER_REVIEW]: {
+        [AuditStatus.REVIEWED_BY_OWNER]: ['Process Owner', 'ProcessOwner'],
+        [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
+      },
+      [AuditStatus.REVIEWED_BY_OWNER]: {
         [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
       },
     };
