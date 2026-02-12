@@ -1,5 +1,5 @@
-import { Controller, Get, Param, Res, UseGuards, Request } from '@nestjs/common';
-import { ReportsService } from './reports.service';
+import { Controller, Get, Param, Res, UseGuards, Request, Body, Post } from '@nestjs/common';
+import { ReportsService, GenerateCustomReportDto } from './reports.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -9,6 +9,12 @@ import * as express from 'express';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) { }
+
+  @Post('custom')
+  @Roles('System Administrator', 'Chief Audit Executive (CAE)', 'Manager', 'Audit Manager')
+  async generateCustomReport(@Body() dto: GenerateCustomReportDto, @Res() res: express.Response) {
+    return this.reportsService.generateCustomReport(dto, res);
+  }
 
   @Get('executive')
   @Roles('System Administrator', 'Chief Audit Executive (CAE)', 'Executive', 'Manager', 'Audit Manager')

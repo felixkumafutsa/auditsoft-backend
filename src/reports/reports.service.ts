@@ -7,12 +7,143 @@ import { NotificationService } from '../notification/notification.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
+export class GenerateCustomReportDto {
+  fields: string[]; // ['auditName', 'status', 'assignedManager', ...]
+  filters: {
+    auditType?: string;
+    status?: string;
+    dateRange?: { start: Date; end: Date };
+  };
+  format: 'pdf' | 'csv';
+}
+
 @Injectable()
 export class ReportsService {
   constructor(
     private prisma: PrismaService,
     private notificationService: NotificationService
-  ) {}
+  ) { }
+
+  // ... existing methods ...
+
+  async generateCustomReport(dto: GenerateCustomReportDto, res: Response) {
+    // 1. Fetch Data
+    const where: any = {};
+    if (dto.filters?.auditType && dto.filters.auditType !== 'All') {
+      where.auditType = dto.filters.auditType;
+    }
+    if (dto.filters?.status && dto.filters.status !== 'All') {
+      where.status = dto.filters.status;
+    }
+    if (dto.filters?.dateRange) {
+      where.createdAt = {
+        gte: new Date(dto.filters.dateRange.start),
+        lte: new Date(dto.filters.dateRange.end),
+      };
+    }
+
+    const audits = await this.prisma.audit.findMany({
+      where,
+      include: {
+        assignedManager: true,
+        auditUniverse: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // 2. Generate Output
+    if (dto.format === 'csv') {
+      return this.generateCustomCSV(audits, dto.fields, res);
+    } else {
+      return this.generateCustomPDF(audits, dto.fields, res);
+    }
+  }
+
+  private async generateCustomCSV(data: any[], fields: string[], res: Response) {
+    const headers = fields.map(f => this.getFieldLabel(f)).join(',');
+    const rows = data.map(row => {
+      return fields.map(field => {
+        let val = this.getFieldValue(row, field);
+        return `"${String(val || '').replace(/"/g, '""')}"`;
+      }).join(',');
+    });
+
+    const csvContent = [headers, ...rows].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=Custom_Report_${Date.now()}.csv`);
+    res.send(csvContent);
+  }
+
+  private async generateCustomPDF(data: any[], fields: string[], res: Response) {
+    const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=Custom_Report_${Date.now()}.pdf`);
+
+    doc.pipe(res);
+
+    // Title
+    doc.fontSize(18).text('Custom Audit Report', { align: 'center' });
+    doc.fontSize(10).text(`Generated on: ${new Date().toLocaleString()}`, { align: 'center' });
+    doc.moveDown();
+
+    // Table Header
+    const tableTop = 100;
+    let currentY = tableTop;
+    const colWidth = (842 - 60) / fields.length; // A4 Landscape width approx 842pt
+
+    doc.fontSize(10).font('Helvetica-Bold');
+    fields.forEach((field, i) => {
+      doc.text(this.getFieldLabel(field), 30 + (i * colWidth), currentY, { width: colWidth, align: 'left' });
+    });
+
+    // Draw Header Line
+    currentY += 15;
+    doc.moveTo(30, currentY).lineTo(812, currentY).stroke();
+    currentY += 10;
+
+    // Table Rows
+    doc.font('Helvetica').fontSize(9);
+
+    for (const row of data) {
+      // Check pagination
+      if (currentY > 550) {
+        doc.addPage({ layout: 'landscape', margin: 30 });
+        currentY = 50;
+      }
+
+      fields.forEach((field, i) => {
+        const val = this.getFieldValue(row, field);
+        doc.text(String(val).substring(0, 50), 30 + (i * colWidth), currentY, { width: colWidth, align: 'left', height: 15 });
+      });
+
+      currentY += 20; // Row height
+    }
+
+    doc.end();
+  }
+
+  private getFieldLabel(field: string): string {
+    const map: any = {
+      id: 'ID',
+      auditName: 'Audit Name',
+      auditType: 'Type',
+      status: 'Status',
+      startDate: 'Start Date',
+      endDate: 'End Date',
+      entityName: 'Entity',
+      assignedTo: 'Manager'
+    };
+    return map[field] || field;
+  }
+
+  private getFieldValue(row: any, field: string): string {
+    if (field === 'assignedTo') return row.assignedManager?.name || 'Unassigned';
+    if (field === 'entityName') return row.auditUniverse?.entityName || 'N/A';
+    if (field === 'startDate' || field === 'endDate') return row[field] ? new Date(row[field]).toLocaleDateString() : '-';
+    return row[field] || '';
+  }
 
   async getExecutiveReport() {
     // 1. Audit Status Distribution
@@ -111,48 +242,48 @@ export class ReportsService {
   async getDashboardStats() {
     // Reusing similar logic or expanding for general dashboard
     const [audits, findings, users] = await Promise.all([
-        this.prisma.audit.count(),
-        this.prisma.finding.count({ where: { status: 'Open' } }),
-        this.prisma.user.count(),
+      this.prisma.audit.count(),
+      this.prisma.finding.count({ where: { status: 'Open' } }),
+      this.prisma.user.count(),
     ]);
 
     // Audit Planning Trend (Last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    
+
     const auditsTrend = await this.prisma.audit.groupBy({
-        by: ['createdAt'],
-        where: {
-            createdAt: {
-                gte: sixMonthsAgo
-            }
-        },
-        _count: {
-            id: true
+      by: ['createdAt'],
+      where: {
+        createdAt: {
+          gte: sixMonthsAgo
         }
+      },
+      _count: {
+        id: true
+      }
     });
 
     // Process trend data to group by month
     const monthlyTrend = auditsTrend.reduce((acc, curr) => {
-        const month = curr.createdAt.toLocaleString('default', { month: 'short' });
-        acc[month] = (acc[month] || 0) + curr._count.id;
-        return acc;
+      const month = curr.createdAt.toLocaleString('default', { month: 'short' });
+      acc[month] = (acc[month] || 0) + curr._count.id;
+      return acc;
     }, {});
 
     const trendData = Object.keys(monthlyTrend).map(key => ({ name: key, audits: monthlyTrend[key] }));
 
     // Audit Status Distribution for Pie Chart
     const auditStatus = await this.prisma.audit.groupBy({
-        by: ['status'],
-        _count: { status: true },
+      by: ['status'],
+      _count: { status: true },
     });
 
     return {
-        totalAudits: audits,
-        openFindings: findings,
-        activeUsers: users,
-        auditTrend: trendData,
-        auditStatusDistribution: auditStatus.map(s => ({ name: s.status, value: s._count.status }))
+      totalAudits: audits,
+      openFindings: findings,
+      activeUsers: users,
+      auditTrend: trendData,
+      auditStatusDistribution: auditStatus.map(s => ({ name: s.status, value: s._count.status }))
     };
   }
 
@@ -170,7 +301,7 @@ export class ReportsService {
       },
       include: {
         audit: {
-           select: { auditName: true }
+          select: { auditName: true }
         },
         generator: {
           select: { name: true }
@@ -182,40 +313,41 @@ export class ReportsService {
     });
 
     return reports.map(report => ({
-        id: report.id,
-        auditId: report.auditId,
-        title: report.title,
-        auditName: report.audit.auditName,
-        generatedBy: report.generator.name,
-        generatedAt: report.generatedAt,
-        fileUrl: report.fileUrl,
-        fileType: report.fileType
+      id: report.id,
+      auditId: report.auditId,
+      title: report.title,
+      auditName: report.audit.auditName,
+      generatedBy: report.generator.name,
+      generatedAt: report.generatedAt,
+      fileUrl: report.fileUrl,
+      fileType: report.fileType
     }));
   }
 
   async getAuditReportData(auditId: number) {
-    const audit = await this.prisma.audit.findUnique({      where: { id: auditId },
+    const audit = await this.prisma.audit.findUnique({
+      where: { id: auditId },
       include: {
         assignedManager: true,
         assignedAuditors: true,
         auditUniverse: true,
         auditPrograms: {
-            include: {
-                findings: true,
-                evidence: true
-            }
+          include: {
+            findings: true,
+            evidence: true
+          }
         },
         findings: {
-            include: {
-                actionPlans: true
-            }
+          include: {
+            actionPlans: true
+          }
         },
         risks: true
       }
     });
 
     if (!audit) {
-        throw new Error('Audit not found');
+      throw new Error('Audit not found');
     }
 
     return audit;
@@ -232,10 +364,10 @@ export class ReportsService {
     doc.text(`Type: ${audit.auditType}`);
     doc.text(`Business Entity: ${audit.auditUniverse?.entityName || 'N/A'} (${audit.auditUniverse?.entityType || 'N/A'})`);
     doc.text(`Audit Manager: ${audit.assignedManager?.name || 'Unassigned'}`);
-    
+
     const auditors = audit.assignedAuditors?.map(a => a.name).join(', ') || 'Unassigned';
     doc.text(`Assigned Auditor(s): ${auditors}`);
-    
+
     doc.text(`Dates: ${audit.startDate ? new Date(audit.startDate).toDateString() : 'N/A'} - ${audit.endDate ? new Date(audit.endDate).toDateString() : 'N/A'}`);
     doc.moveDown();
 
@@ -275,7 +407,7 @@ export class ReportsService {
       totalEvidence += program.evidence?.length || 0;
     });
     doc.fontSize(12).text(`Total Evidence Files Uploaded: ${totalEvidence}`);
-    
+
     doc.end();
   }
 
@@ -304,7 +436,7 @@ export class ReportsService {
         title: 'Report Generated',
         message: `New Audit Report generated for ${audit.auditName}. You can download it now.`,
         type: 'REPORT_GENERATED',
-        link: `/reports/audit/${auditId}/pdf` 
+        link: `/reports/audit/${auditId}/pdf`
       });
     }
   }
@@ -375,54 +507,54 @@ export class ReportsService {
 
   async generateWord(auditId: number, res: Response) {
     const audit = await this.getAuditReportData(auditId);
-    
+
     const doc = new Document({
-        sections: [{
-            properties: {},
-            children: [
-                new Paragraph({
-                    text: `Audit Report: ${audit.auditName}`,
-                    heading: HeadingLevel.TITLE,
-                    alignment: AlignmentType.CENTER,
-                }),
-                new Paragraph({
-                    text: `Status: ${audit.status}`,
-                    heading: HeadingLevel.HEADING_2,
-                }),
-                 new Paragraph({
-                    text: `Manager: ${audit.assignedManager?.name || 'Unassigned'}`,
-                }),
-                 new Paragraph({
-                    text: `Findings Count: ${audit.findings.length}`,
-                }),
-                // Add more sections as needed
-            ],
-        }],
+      sections: [{
+        properties: {},
+        children: [
+          new Paragraph({
+            text: `Audit Report: ${audit.auditName}`,
+            heading: HeadingLevel.TITLE,
+            alignment: AlignmentType.CENTER,
+          }),
+          new Paragraph({
+            text: `Status: ${audit.status}`,
+            heading: HeadingLevel.HEADING_2,
+          }),
+          new Paragraph({
+            text: `Manager: ${audit.assignedManager?.name || 'Unassigned'}`,
+          }),
+          new Paragraph({
+            text: `Findings Count: ${audit.findings.length}`,
+          }),
+          // Add more sections as needed
+        ],
+      }],
     });
 
     const buffer = await Packer.toBuffer(doc);
-    
+
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename=Audit_Report_${auditId}.docx`);
     res.send(buffer);
 
     // Notify relevant users (Manager and Auditors)
     const recipients = [
-        ...(audit.assignedManagerId ? [audit.assignedManagerId] : []),
-        ...audit.assignedAuditors.map(a => a.id)
+      ...(audit.assignedManagerId ? [audit.assignedManagerId] : []),
+      ...audit.assignedAuditors.map(a => a.id)
     ];
 
     // Remove duplicates
     const uniqueRecipients = [...new Set(recipients)];
 
     for (const userId of uniqueRecipients) {
-        await this.notificationService.create({
-            userId,
-            title: 'Report Generated',
-            message: `New Audit Report generated for ${audit.auditName}. You can download it now.`,
-            type: 'REPORT_GENERATED',
-            link: `/reports/audit/${auditId}/docx` // Or a frontend link to view
-        });
+      await this.notificationService.create({
+        userId,
+        title: 'Report Generated',
+        message: `New Audit Report generated for ${audit.auditName}. You can download it now.`,
+        type: 'REPORT_GENERATED',
+        link: `/reports/audit/${auditId}/docx` // Or a frontend link to view
+      });
     }
   }
 }
