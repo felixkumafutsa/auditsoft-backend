@@ -21,6 +21,12 @@ let UserController = class UserController {
     constructor(userService) {
         this.userService = userService;
     }
+    getProfile(req) {
+        return this.userService.findOne(req.user.id);
+    }
+    getTasks(req) {
+        return this.userService.getTasks(req.user.id);
+    }
     getAll() {
         return this.userService.findAll();
     }
@@ -45,11 +51,24 @@ let UserController = class UserController {
     getUserRoles(userId) {
         return this.userService.getUserRoles(userId);
     }
-    getTasks(req) {
-        return this.userService.getTasks(req.user.userId);
-    }
 };
 exports.UserController = UserController;
+__decorate([
+    (0, common_1.Get)('me'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], UserController.prototype, "getProfile", null);
+__decorate([
+    (0, common_1.Get)('me/tasks'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], UserController.prototype, "getTasks", null);
 __decorate([
     (0, common_1.Get)(),
     __metadata("design:type", Function),
@@ -108,14 +127,6 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], UserController.prototype, "getUserRoles", null);
-__decorate([
-    (0, common_1.Get)('me/tasks'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    __param(0, (0, common_1.Request)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
-], UserController.prototype, "getTasks", null);
 exports.UserController = UserController = __decorate([
     (0, common_1.Controller)('users'),
     __metadata("design:paramtypes", [user_service_1.UserService])

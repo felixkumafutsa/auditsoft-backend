@@ -4,7 +4,19 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('users')
 export class UserController {
-  constructor(private userService: UserService) {}
+  constructor(private userService: UserService) { }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  getProfile(@Request() req) {
+    return this.userService.findOne(req.user.id);
+  }
+
+  @Get('me/tasks')
+  @UseGuards(JwtAuthGuard)
+  getTasks(@Request() req) {
+    return this.userService.getTasks(req.user.id);
+  }
 
   @Get()
   getAll() {
@@ -50,11 +62,5 @@ export class UserController {
   @Get(':userId/roles')
   getUserRoles(@Param('userId', ParseIntPipe) userId: number) {
     return this.userService.getUserRoles(userId);
-  }
-
-  @Get('me/tasks')
-  @UseGuards(JwtAuthGuard)
-  getTasks(@Request() req) {
-    return this.userService.getTasks(req.user.userId); 
   }
 }

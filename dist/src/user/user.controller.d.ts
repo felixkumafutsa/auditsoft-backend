@@ -2,6 +2,17 @@ import { UserService, CreateUserDto, UpdateUserDto } from './user.service';
 export declare class UserController {
     private userService;
     constructor(userService: UserService);
+    getProfile(req: any): Promise<Omit<{
+        name: string;
+        id: number;
+        email: string;
+        passwordHash: string;
+        status: string;
+        mfaEnabled: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+    }, "passwordHash">>;
+    getTasks(req: any): Promise<any[]>;
     getAll(): Promise<any[]>;
     getOne(id: number): Promise<Omit<{
         name: string;
@@ -46,5 +57,4 @@ export declare class UserController {
     assignRole(userId: number, roleId: number): Promise<any>;
     removeRole(userId: number, roleId: number): Promise<void>;
     getUserRoles(userId: number): Promise<any[]>;
-    getTasks(req: any): Promise<any[]>;
 }
