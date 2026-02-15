@@ -156,11 +156,11 @@ let AuditWorkflowService = class AuditWorkflowService {
                 [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
             },
             [AuditStatus.FINALIZED]: {
-                [AuditStatus.PROCESS_OWNER_REVIEW]: ['Process Owner', 'ProcessOwner'],
+                [AuditStatus.PROCESS_OWNER_REVIEW]: ['Audit Manager', 'Manager', 'Chief Audit Executive (CAE)', 'CAE'],
                 [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
             },
             [AuditStatus.PROCESS_OWNER_REVIEW]: {
-                [AuditStatus.REVIEWED_BY_OWNER]: ['Process Owner', 'ProcessOwner'],
+                [AuditStatus.REVIEWED_BY_OWNER]: ['Audit Manager', 'Manager', 'Chief Audit Executive (CAE)', 'CAE'],
                 [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
             },
             [AuditStatus.REVIEWED_BY_OWNER]: {

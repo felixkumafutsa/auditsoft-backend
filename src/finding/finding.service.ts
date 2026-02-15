@@ -32,7 +32,7 @@ export class FindingService {
     private workflowService: FindingWorkflowService,
     private auditService: AuditService,
     private notificationService: NotificationService,
-  ) {}
+  ) { }
 
   async findAll(): Promise<Finding[]> {
     return this.prisma.finding.findMany({
@@ -128,7 +128,7 @@ export class FindingService {
   ): Promise<Finding> {
     const finding = await this.findOne(id);
     const currentStatus = finding.status;
-    
+
     // Normalize inputs
     const normalizedToStatus = toStatus.trim();
     const normalizedUserRole = userRole?.trim();
@@ -137,7 +137,7 @@ export class FindingService {
     const audit = await this.auditService.findOne(finding.auditId) as any;
     const allowedAuditStatuses = ['In Progress', 'Under Review', 'Execution Finished', 'Finalized', 'Process Owner Review'];
     if (!allowedAuditStatuses.includes(audit.status)) {
-        throw new BadRequestException(`Finding status cannot be changed when audit is in '${audit.status}' status.`);
+      throw new BadRequestException(`Finding status cannot be changed when audit is in '${audit.status}' status.`);
     }
 
     // Validate transition
@@ -180,64 +180,64 @@ export class FindingService {
 
       // Identified -> Validated: Notify Audit Manager
       if (currentStatus === 'Identified' && toStatus === 'Validated') {
-         if (audit.assignedManagerId) {
-           await this.notificationService.create({
-             userId: audit.assignedManagerId,
-             title: 'Finding Validated',
-             message: `A finding in audit '${audit.auditName}' has been validated and requires attention.`,
-             type: 'info',
-             link
-           });
-         }
+        if (audit.assignedManagerId) {
+          await this.notificationService.create({
+            userId: audit.assignedManagerId,
+            title: 'Finding Validated',
+            message: `A finding in audit '${audit.auditName}' has been validated and requires attention.`,
+            type: 'info',
+            link
+          });
+        }
       }
 
       // Validated -> Action Assigned: Notify Auditors and Process Owner
       if (currentStatus === 'Validated' && toStatus === 'Action Assigned') {
-         // Notify Auditors
-         for (const auditor of audit.assignedAuditors) {
-           await this.notificationService.create({
-             userId: auditor.id,
-             title: 'Action Plan Assigned',
-             message: `Action plan assigned for finding in '${audit.auditName}'.`,
-             type: 'info',
-             link
-           });
-         }
+        // Notify Auditors
+        for (const auditor of audit.assignedAuditors) {
+          await this.notificationService.create({
+            userId: auditor.id,
+            title: 'Action Plan Assigned',
+            message: `Action plan assigned for finding in '${audit.auditName}'.`,
+            type: 'info',
+            link
+          });
+        }
 
-         // Notify Process Owner
-         if (audit.auditUniverse?.ownerId) {
-            await this.notificationService.create({
-              userId: audit.auditUniverse.ownerId,
-              title: 'Action Plan Required',
-              message: `A finding in '${audit.auditName}' requires an action plan from you.`,
-              type: 'action_required',
-              link
-            });
-         }
+        // Notify Audit Manager (was Process Owner)
+        if (audit.assignedManagerId) {
+          await this.notificationService.create({
+            userId: audit.assignedManagerId,
+            title: 'Action Plan Required',
+            message: `A finding in '${audit.auditName}' requires an action plan.`,
+            type: 'action_required',
+            link
+          });
+        }
       }
 
       // Remediation In Progress -> Verified: Notify CAE to close
       if (currentStatus === 'Remediation In Progress' && toStatus === 'Verified') {
-         const caes = await this.prisma.user.findMany({
-           where: {
-             userRoles: {
-               some: {
-                 role: {
-                   roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
-                 }
-               }
-             }
-           }
-         });
-         for (const cae of caes) {
-           await this.notificationService.create({
-             userId: cae.id,
-             title: 'Finding Verified',
-             message: `A finding in audit '${audit.auditName}' has been verified. Closing is pending.`,
-             type: 'action_required',
-             link
-           });
-         }
+        const caes = await this.prisma.user.findMany({
+          where: {
+            userRoles: {
+              some: {
+                role: {
+                  roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+                }
+              }
+            }
+          }
+        });
+        for (const cae of caes) {
+          await this.notificationService.create({
+            userId: cae.id,
+            title: 'Finding Verified',
+            message: `A finding in audit '${audit.auditName}' has been verified. Closing is pending.`,
+            type: 'action_required',
+            link
+          });
+        }
       }
     } catch (e) {
       console.error('Failed to send finding notification', e);

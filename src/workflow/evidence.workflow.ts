@@ -51,18 +51,18 @@ export class EvidenceWorkflowService {
   getPermittedRoles(fromStatus: string, toStatus: string): string[] {
     const transitions: Record<string, Record<string, string[]>> = {
       [EvidenceStatus.UPLOADED]: {
-        [EvidenceStatus.REVIEWED]: ['Audit Manager', 'Manager', 'Admin'],
-        [EvidenceStatus.REJECTED]: ['Audit Manager', 'Manager', 'Admin'],
+        [EvidenceStatus.REVIEWED]: ['Audit Manager', 'Manager', 'Chief Audit Executive (CAE)', 'CAE', 'Admin', 'System Administrator'],
+        [EvidenceStatus.REJECTED]: ['Audit Manager', 'Manager', 'Chief Audit Executive (CAE)', 'CAE', 'Admin', 'System Administrator'],
       },
       [EvidenceStatus.REVIEWED]: {
-        [EvidenceStatus.APPROVED]: ['Chief Audit Executive (CAE)', 'CAE', 'Admin'],
-        [EvidenceStatus.REJECTED]: ['Chief Audit Executive (CAE)', 'CAE', 'Admin'],
+        [EvidenceStatus.APPROVED]: ['Chief Audit Executive (CAE)', 'CAE', 'Admin', 'System Administrator'],
+        [EvidenceStatus.REJECTED]: ['Chief Audit Executive (CAE)', 'CAE', 'Admin', 'System Administrator'],
       },
       [EvidenceStatus.REJECTED]: {
         [EvidenceStatus.UPLOADED]: ['Auditor'],
       },
       [EvidenceStatus.APPROVED]: {
-        [EvidenceStatus.ARCHIVED]: ['Chief Audit Executive (CAE)', 'CAE', 'Admin'],
+        [EvidenceStatus.ARCHIVED]: ['Chief Audit Executive (CAE)', 'CAE', 'Admin', 'System Administrator'],
       },
     };
 

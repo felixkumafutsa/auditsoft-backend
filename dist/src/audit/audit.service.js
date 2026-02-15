@@ -283,9 +283,9 @@ let AuditService = class AuditService {
                 }
             }
             if (existingAudit.status === 'Execution Finished' && data.status === 'Finalized') {
-                if (updatedAudit.auditUniverse?.ownerId) {
+                if (updatedAudit.assignedManagerId) {
                     await this.notificationService.create({
-                        userId: updatedAudit.auditUniverse.ownerId,
+                        userId: updatedAudit.assignedManagerId,
                         title: 'Audit Finalized - Ready for Review',
                         message: `The audit '${auditName}' has been finalized and is ready for your review.`,
                         type: 'action_required',

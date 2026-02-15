@@ -37,19 +37,19 @@ export class AuditService {
     private prisma: PrismaService,
     private notificationService: NotificationService,
     private reportsService: ReportsService
-  ) {}
+  ) { }
 
   async findAll(user?: any): Promise<Audit[]> {
     const where: any = {
       status: { not: 'Template' } // Exclude templates from normal list
     };
-    
+
     // Role-based filtering
     if (user) {
       const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
       const isAuditor = roles.includes('Auditor');
       const isProcessOwner = roles.includes('Process Owner');
-      
+
       if (isAuditor) {
         where.assignedAuditors = { some: { id: user.id } };
       } else if (isProcessOwner) {
@@ -57,12 +57,12 @@ export class AuditService {
       }
     }
 
-    return this.prisma.audit.findMany({ 
+    return this.prisma.audit.findMany({
       where,
-      include: { 
-        findings: true, 
-        auditPrograms: true, 
-        assignedManager: true, 
+      include: {
+        findings: true,
+        auditPrograms: true,
+        assignedManager: true,
         assignedAuditors: true,
         auditUniverse: true
       },
@@ -84,7 +84,7 @@ export class AuditService {
       // Check if user has Auditor role
       const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
       const isAuditor = roles.includes('Auditor');
-      
+
       if (isAuditor) {
         const isAssigned = audit.assignedAuditors.some((auditor) => auditor.id === user.id);
         if (!isAssigned) {
@@ -180,7 +180,7 @@ export class AuditService {
             },
           });
         }
-        
+
         // Reload audit to include new programs
         return this.findOne(newAudit.id);
       }
@@ -200,15 +200,15 @@ export class AuditService {
     }
 
     // Explicitly pick allowed fields to avoid passing relations (like findings=[]) that cause Prisma errors
-    const { 
-      auditName, 
-      auditType, 
-      status, 
-      startDate, 
-      endDate, 
-      assignedManagerId, 
-      auditUniverseId, 
-      assignedAuditorIds 
+    const {
+      auditName,
+      auditType,
+      status,
+      startDate,
+      endDate,
+      assignedManagerId,
+      auditUniverseId,
+      assignedAuditorIds
     } = data;
 
     const updateData: any = {
@@ -230,10 +230,10 @@ export class AuditService {
     const updatedAudit = await this.prisma.audit.update({
       where: { id },
       data: updateData,
-      include: { 
-        findings: true, 
-        auditPrograms: true, 
-        assignedAuditors: true, 
+      include: {
+        findings: true,
+        auditPrograms: true,
+        assignedAuditors: true,
         assignedManager: true,
         auditUniverse: {
           include: {
@@ -245,7 +245,7 @@ export class AuditService {
 
     // Notify Auditors if assigned (New Assignments only)
     if (data.assignedAuditorIds && data.assignedAuditorIds.length > 0) {
-      const newAuditorIds = data.assignedAuditorIds.filter(id => 
+      const newAuditorIds = data.assignedAuditorIds.filter(id =>
         !existingAudit.assignedAuditors?.some(a => a.id === id)
       );
 
@@ -320,7 +320,7 @@ export class AuditService {
             }
           }
         });
-        
+
         for (const cae of caes) {
           await this.notificationService.create({
             userId: cae.id,
@@ -332,11 +332,11 @@ export class AuditService {
         }
       }
 
-      // Execution Finished -> Finalized: Alert Process Owner
+      // Execution Finished -> Finalized: Alert Manager (was Process Owner)
       if (existingAudit.status === 'Execution Finished' && data.status === 'Finalized') {
-        if (updatedAudit.auditUniverse?.ownerId) {
+        if (updatedAudit.assignedManagerId) {
           await this.notificationService.create({
-            userId: updatedAudit.auditUniverse.ownerId,
+            userId: updatedAudit.assignedManagerId,
             title: 'Audit Finalized - Ready for Review',
             message: `The audit '${auditName}' has been finalized and is ready for your review.`,
             type: 'action_required',
@@ -358,7 +358,7 @@ export class AuditService {
             }
           }
         });
-        
+
         for (const cae of caes) {
           await this.notificationService.create({
             userId: cae.id,
@@ -373,7 +373,7 @@ export class AuditService {
       // Process Owner Review -> Closed: Generate report and notify
       if (data.status === 'Closed') {
         await this.reportsService.generatePDFToFile(updatedAudit.id);
-        
+
         if (updatedAudit.assignedManagerId) {
           await this.notificationService.create({
             userId: updatedAudit.assignedManagerId,

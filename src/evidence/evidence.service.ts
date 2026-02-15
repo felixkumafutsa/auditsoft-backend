@@ -17,7 +17,7 @@ export class EvidenceService {
     private notificationService: NotificationService,
     private workflowService: EvidenceWorkflowService,
     private auditLogService: AuditLogService,
-  ) {}
+  ) { }
 
   async create(auditProgramId: number, file: any, description?: string, uploadedById?: number, user?: any) {
     if (user) {
@@ -37,7 +37,7 @@ export class EvidenceService {
         throw new BadRequestException(`Evidence can only be uploaded for audits that are 'In Progress'. Current status: ${audit.status}`);
       }
     }
-    
+
     const created = await this.prisma.evidence.create({
       data: {
         auditProgramId,
@@ -106,16 +106,17 @@ export class EvidenceService {
   }
 
   async findAll(auditProgramId: number) {
-    return this.prisma.evidence.findMany({
+    const items = await this.prisma.evidence.findMany({
       where: { auditProgramId },
       include: { uploadedBy: true },
     });
+    return this.attachFileStatus(items);
   }
 
   async findAllGlobal(status?: string) {
-    return this.prisma.evidence.findMany({
+    const items = await this.prisma.evidence.findMany({
       where: status ? { status } : {},
-      include: { 
+      include: {
         uploadedBy: true,
         auditProgram: {
           include: {
@@ -125,18 +126,44 @@ export class EvidenceService {
       },
       orderBy: { uploadedAt: 'desc' }
     });
+    return this.attachFileStatus(items);
+  }
+
+  private attachFileStatus(items: any[]) {
+    const fs = require('fs');
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'evidence');
+    return items.map(item => {
+      const filePath = path.join(uploadsDir, `${item.id}-${item.fileName}`);
+      return {
+        ...item,
+        fileMissing: !fs.existsSync(filePath)
+      };
+    });
   }
 
   async remove(id: number) {
+    const evidence = await this.prisma.evidence.findUnique({
+      where: { id },
+      select: { status: true }
+    });
+
+    if (!evidence) {
+      throw new BadRequestException('Evidence not found');
+    }
+
+    if (evidence.status !== EvidenceStatus.UPLOADED) {
+      throw new BadRequestException(`Evidence cannot be deleted in '${evidence.status}' status. Deletion is only allowed for 'Uploaded' evidence.`);
+    }
+
     return this.prisma.evidence.delete({
       where: { id },
     });
   }
 
   async findOne(id: number) {
-    return this.prisma.evidence.findUnique({
+    const item = await this.prisma.evidence.findUnique({
       where: { id },
-      include: { 
+      include: {
         uploadedBy: true,
         versions: {
           orderBy: { version: 'desc' },
@@ -144,6 +171,15 @@ export class EvidenceService {
         }
       },
     });
+
+    if (!item) return null;
+
+    const fs = require('fs');
+    const filePath = path.join(process.cwd(), 'uploads', 'evidence', `${item.id}-${item.fileName}`);
+    return {
+      ...item,
+      fileMissing: !fs.existsSync(filePath)
+    };
   }
 
   async createVersion(id: number, file: any, uploadedById: number, changeDescription?: string) {
@@ -212,20 +248,20 @@ export class EvidenceService {
     if (!evidence) throw new BadRequestException('Evidence not found');
 
     const auditProgram = await this.prisma.auditProgram.findUnique({
-        where: { id: evidence.auditProgramId },
-        select: { auditId: true }
+      where: { id: evidence.auditProgramId },
+      select: { auditId: true }
     });
     if (auditProgram?.auditId) {
-        const audit = await this.auditService.findOne(auditProgram.auditId);
-        const allowedAuditStatuses = ['In Progress', 'Under Review', 'Execution Finished', 'Finalized', 'Process Owner Review'];
-        if (!allowedAuditStatuses.includes(audit.status)) {
-            throw new BadRequestException(`Evidence status cannot be changed when audit is in '${audit.status}' status.`);
-        }
+      const audit = await this.auditService.findOne(auditProgram.auditId);
+      const allowedAuditStatuses = ['In Progress', 'Under Review', 'Execution Finished', 'Finalized', 'Process Owner Review'];
+      if (!allowedAuditStatuses.includes(audit.status)) {
+        throw new BadRequestException(`Evidence status cannot be changed when audit is in '${audit.status}' status.`);
+      }
     }
 
     // Validate Transition
     if (!this.workflowService.canTransition(evidence.status, status)) {
-        throw new BadRequestException(`Cannot transition evidence from ${evidence.status} to ${status}`);
+      throw new BadRequestException(`Cannot transition evidence from ${evidence.status} to ${status}`);
     }
 
     const updatedEvidence = await this.prisma.evidence.update({
@@ -246,69 +282,69 @@ export class EvidenceService {
 
     // Notifications
     try {
-        const auditProgram = updatedEvidence.auditProgram;
-        const audit = await this.auditService.findOne(auditProgram.auditId);
-        const auditName = audit.auditName;
-        const link = `/audits/${audit.id}`; // Or evidence specific link
+      const auditProgram = updatedEvidence.auditProgram;
+      const audit = await this.auditService.findOne(auditProgram.auditId);
+      const auditName = audit.auditName;
+      const link = `/audits/${audit.id}`; // Or evidence specific link
 
-        // Reviewed: Notify CAE to approve
-        if (status === EvidenceStatus.REVIEWED) {
-            const caes = await this.prisma.user.findMany({
-              where: {
-                userRoles: {
-                  some: {
-                    role: {
-                      roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
-                    }
-                  }
+      // Reviewed: Notify CAE to approve
+      if (status === EvidenceStatus.REVIEWED) {
+        const caes = await this.prisma.user.findMany({
+          where: {
+            userRoles: {
+              some: {
+                role: {
+                  roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
                 }
               }
-            });
-            for (const cae of caes) {
-              await this.notificationService.create({
-                userId: cae.id,
-                title: 'Evidence Reviewed',
-                message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' is ready for approval.`,
-                type: 'action_required',
-                link
-              });
             }
+          }
+        });
+        for (const cae of caes) {
+          await this.notificationService.create({
+            userId: cae.id,
+            title: 'Evidence Reviewed',
+            message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' is ready for approval.`,
+            type: 'action_required',
+            link
+          });
         }
+      }
 
-        // Approved: Notify CAE to archive
-        if (status === EvidenceStatus.APPROVED) {
-            const caes = await this.prisma.user.findMany({
-              where: {
-                userRoles: {
-                  some: {
-                    role: {
-                      roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
-                    }
-                  }
+      // Approved: Notify CAE to archive
+      if (status === EvidenceStatus.APPROVED) {
+        const caes = await this.prisma.user.findMany({
+          where: {
+            userRoles: {
+              some: {
+                role: {
+                  roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
                 }
               }
-            });
-            for (const cae of caes) {
-              await this.notificationService.create({
-                userId: cae.id,
-                title: 'Evidence Approved',
-                message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' has been approved. Archiving is pending.`,
-                type: 'info',
-                link
-              });
             }
+          }
+        });
+        for (const cae of caes) {
+          await this.notificationService.create({
+            userId: cae.id,
+            title: 'Evidence Approved',
+            message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' has been approved. Archiving is pending.`,
+            type: 'info',
+            link
+          });
         }
+      }
 
-        // Rejected: Notify Uploader
-        if (status === EvidenceStatus.REJECTED) {
-             await this.notificationService.create({
-                userId: updatedEvidence.uploadedById,
-                title: 'Evidence Rejected',
-                message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' was rejected.`,
-                type: 'warning',
-                link
-            });
-        }
+      // Rejected: Notify Uploader
+      if (status === EvidenceStatus.REJECTED) {
+        await this.notificationService.create({
+          userId: updatedEvidence.uploadedById,
+          title: 'Evidence Rejected',
+          message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' was rejected.`,
+          type: 'warning',
+          link
+        });
+      }
 
     } catch (e) {
       console.error('Failed to send evidence notification', e);

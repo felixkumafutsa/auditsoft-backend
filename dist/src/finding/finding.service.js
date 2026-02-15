@@ -174,11 +174,11 @@ let FindingService = class FindingService {
                         link
                     });
                 }
-                if (audit.auditUniverse?.ownerId) {
+                if (audit.assignedManagerId) {
                     await this.notificationService.create({
-                        userId: audit.auditUniverse.ownerId,
+                        userId: audit.assignedManagerId,
                         title: 'Action Plan Required',
-                        message: `A finding in '${audit.auditName}' requires an action plan from you.`,
+                        message: `A finding in '${audit.auditName}' requires an action plan.`,
                         type: 'action_required',
                         link
                     });

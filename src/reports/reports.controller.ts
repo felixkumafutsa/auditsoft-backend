@@ -17,7 +17,7 @@ export class ReportsController {
   }
 
   @Get('executive')
-  @Roles('System Administrator', 'Chief Audit Executive (CAE)', 'Executive', 'Manager', 'Audit Manager')
+  @Roles('System Administrator', 'Chief Audit Executive (CAE)', 'Executive', 'Manager', 'Audit Manager', 'Board Viewer', 'BoardViewer', 'Process Owner', 'ProcessOwner', 'Executive / Board Viewer')
   getExecutiveReport() {
     return this.reportsService.getExecutiveReport();
   }
@@ -29,7 +29,7 @@ export class ReportsController {
   }
 
   @Get('dashboard')
-  @Roles('System Administrator', 'Chief Audit Executive (CAE)', 'Executive', 'Manager', 'Audit Manager', 'Auditor')
+  @Roles('System Administrator', 'Chief Audit Executive (CAE)', 'Executive', 'Manager', 'Audit Manager', 'Auditor', 'Executive / Board Viewer')
   getDashboardStats() {
     return this.reportsService.getDashboardStats();
   }

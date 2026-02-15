@@ -26,7 +26,7 @@ export class EvidenceController {
   constructor(
     private readonly evidenceService: EvidenceService,
     private readonly workflowService: EvidenceWorkflowService,
-  ) {}
+  ) { }
 
   @Post()
   @UseInterceptors(FileInterceptor('file'))
@@ -62,7 +62,12 @@ export class EvidenceController {
     }
     const currentStatus = evidence.status;
     const normalizedToStatus = body.toStatus.trim();
-    const normalizedUserRole = body.userRole?.trim();
+    // Try to get role from body, then from request user (JWT), then default to 'Auditor'
+    let normalizedUserRole = body.userRole?.trim();
+    if (!normalizedUserRole && req.user?.roles) {
+      const roles = Array.isArray(req.user.roles) ? req.user.roles : [req.user.roles];
+      normalizedUserRole = roles[0]; // Take the first role as primary
+    }
 
     // Validate transition
     if (!this.workflowService.canTransition(currentStatus, normalizedToStatus)) {
@@ -76,9 +81,9 @@ export class EvidenceController {
       currentStatus,
       normalizedToStatus,
     );
-    if (normalizedUserRole && !permittedRoles.includes(normalizedUserRole)) {
+    if (!permittedRoles.includes(normalizedUserRole || 'Auditor')) {
       throw new BadRequestException(
-        `Role ${normalizedUserRole} is not permitted to transition from ${currentStatus} to ${normalizedToStatus}`,
+        `Role ${normalizedUserRole || 'Auditor'} is not permitted to transition from ${currentStatus} to ${normalizedToStatus}`,
       );
     }
 
@@ -121,10 +126,25 @@ export class EvidenceController {
     @Param('id', ParseIntPipe) id: number,
     @Res() res: Response,
   ) {
-    const info = await this.evidenceService.getFileInfo(id);
-    res.setHeader('Content-Type', info.fileType || 'application/octet-stream');
-    // Inline to allow browser preview (PDF/images). Users can still download from the preview.
-    res.setHeader('Content-Disposition', `inline; filename="${info.fileName}"`);
-    return res.sendFile(info.filePath);
+    try {
+      const info = await this.evidenceService.getFileInfo(id);
+
+      // Check if file exists on disk
+      const fs = require('fs');
+      if (!fs.existsSync(info.filePath)) {
+        throw new NotFoundException(`File not found on server disk: ${info.filePath}`);
+      }
+
+      res.setHeader('Content-Type', info.fileType || 'application/octet-stream');
+      // Inline to allow browser preview (PDF/images). Users can still download from the preview.
+      res.setHeader('Content-Disposition', `inline; filename="${info.fileName}"`);
+      return res.sendFile(info.filePath);
+    } catch (error) {
+      console.error('Download error:', error.message);
+      if (error instanceof NotFoundException) {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(500).json({ message: 'Internal server error during download' });
+    }
   }
 }
