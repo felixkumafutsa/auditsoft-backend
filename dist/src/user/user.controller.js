@@ -16,6 +16,8 @@ exports.UserController = void 0;
 const common_1 = require("@nestjs/common");
 const user_service_1 = require("./user.service");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
+const roles_guard_1 = require("../common/guards/roles.guard");
+const roles_decorator_1 = require("../common/decorators/roles.decorator");
 let UserController = class UserController {
     userService;
     constructor(userService) {
@@ -48,6 +50,9 @@ let UserController = class UserController {
     removeRole(userId, roleId) {
         return this.userService.removeRole(userId, roleId);
     }
+    createProcessOwner(data) {
+        return this.userService.createProcessOwner(data);
+    }
     getUserRoles(userId) {
         return this.userService.getUserRoles(userId);
     }
@@ -55,7 +60,6 @@ let UserController = class UserController {
 exports.UserController = UserController;
 __decorate([
     (0, common_1.Get)('me'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __param(0, (0, common_1.Request)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -121,6 +125,14 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], UserController.prototype, "removeRole", null);
 __decorate([
+    (0, common_1.Post)('process-owner'),
+    (0, roles_decorator_1.Roles)('System Administrator'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [user_service_1.CreateProcessOwnerDto]),
+    __metadata("design:returntype", void 0)
+], UserController.prototype, "createProcessOwner", null);
+__decorate([
     (0, common_1.Get)(':userId/roles'),
     __param(0, (0, common_1.Param)('userId', common_1.ParseIntPipe)),
     __metadata("design:type", Function),
@@ -129,6 +141,7 @@ __decorate([
 ], UserController.prototype, "getUserRoles", null);
 exports.UserController = UserController = __decorate([
     (0, common_1.Controller)('users'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     __metadata("design:paramtypes", [user_service_1.UserService])
 ], UserController);
 //# sourceMappingURL=user.controller.js.map

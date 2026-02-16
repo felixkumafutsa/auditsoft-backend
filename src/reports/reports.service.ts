@@ -289,19 +289,19 @@ export class ReportsService {
 
   async getReportsList(user: any) {
     // Audit Managers see reports for audits they manage or all if they are generic managers (depending on business rule, assuming all for now or restricted)
-    // CAE sees all.
-    // For simplicity based on prompt "available to audit manager and the Chief Auditor Executive", we return all reports for closed audits.
+    // Chief Auditor sees all.
+    // For simplicity based on prompt "available to audit manager and the Chief Auditor", we return all reports for closed audits.
     // We can add filtering if needed later.
 
     const reports = await this.prisma.report.findMany({
       where: {
         audit: {
-          status: 'Closed'
+          status: { in: ['Finalized', 'Pending Chief Auditor Approval', 'Process Owner Review', 'Closed'] }
         }
       },
       include: {
         audit: {
-          select: { auditName: true }
+          select: { auditName: true, status: true }
         },
         generator: {
           select: { name: true }
@@ -317,6 +317,7 @@ export class ReportsService {
       auditId: report.auditId,
       title: report.title,
       auditName: report.audit.auditName,
+      auditStatus: report.audit.status,
       generatedBy: report.generator.name,
       generatedAt: report.generatedAt,
       fileUrl: report.fileUrl,
@@ -459,7 +460,7 @@ export class ReportsService {
       writeStream.on('error', reject);
     });
 
-    // Notify Manager (review-only) and CAE (download)
+    // Notify Manager (review-only) and Chief Auditor (download)
     const recipientsReview = audit.assignedManagerId ? [audit.assignedManagerId] : [];
     for (const userId of recipientsReview) {
       await this.notificationService.create({
@@ -470,35 +471,41 @@ export class ReportsService {
         link: `/reports/audit/${auditId}/preview`,
       });
     }
-    const caes = await this.prisma.user.findMany({
+    // Notify Chief Auditors
+    const chiefAuditors = await this.prisma.user.findMany({
       where: {
         userRoles: {
           some: {
             role: {
-              roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+              roleName: { in: ['Chief Auditor'] }
             }
           }
         }
       }
     });
-    for (const cae of caes) {
+    for (const chiefAuditor of chiefAuditors) {
       await this.notificationService.create({
-        userId: cae.id,
+        userId: chiefAuditor.id,
         title: 'Audit Report Ready',
         message: `Audit report for '${audit.auditName}' is ready to download.`,
         type: 'REPORT_READY',
-        link: `/reports/audit/${auditId}/file`,
+        link: `/reports/audit/${auditId}/download`,
       });
     }
 
     return filePath;
   }
 
-  async streamStoredPDF(auditId: number, res: Response, attachment: boolean) {
+  /**
+   * Stream a stored PDF file
+   */
+  async streamStoredPDF(auditId: number, res: Response, attachment: boolean = false) {
     const filePath = path.join(__dirname, '..', '..', 'uploads', 'reports', `Audit_Report_${auditId}.pdf`);
+    
     if (!fs.existsSync(filePath)) {
-      throw new NotFoundException('Report file not found. Try regenerating.');
+      throw new NotFoundException('Report file not found');
     }
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `${attachment ? 'attachment' : 'inline'}; filename=Audit_Report_${auditId}.pdf`);
     const stream = fs.createReadStream(filePath);
@@ -556,6 +563,93 @@ export class ReportsService {
         link: `/reports/audit/${auditId}/docx` // Or a frontend link to view
       });
     }
+  }
+
+  /**
+   * Save audit report to database and notify CAE for approval
+   */
+  async saveReport(auditId: number, user: any) {
+    const audit = await this.prisma.audit.findUnique({
+      where: { id: auditId },
+      include: {
+        assignedManager: true,
+      }
+    });
+
+    if (!audit) {
+      throw new NotFoundException(`Audit with ID ${auditId} not found`);
+    }
+
+    // Check if report file exists
+    const filePath = path.join(__dirname, '..', '..', 'uploads', 'reports', `Audit_Report_${auditId}.pdf`);
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('Report file not found. Please ensure the audit has been finalized.');
+    }
+
+    // Check if report already exists for this audit
+    const existingReport = await this.prisma.report.findFirst({
+      where: { auditId }
+    });
+
+    let report;
+    if (existingReport) {
+      // Update existing report
+      report = await this.prisma.report.update({
+        where: { id: existingReport.id },
+        data: {
+          generatedBy: user.id || user.sub,
+          generatedAt: new Date(),
+          fileUrl: `/uploads/reports/Audit_Report_${auditId}.pdf`,
+          fileType: 'pdf',
+        }
+      });
+    } else {
+      // Create new report record
+      report = await this.prisma.report.create({
+        data: {
+          auditId,
+          title: `Audit Report - ${audit.auditName}`,
+          generatedBy: user.id || user.sub,
+          fileUrl: `/uploads/reports/Audit_Report_${auditId}.pdf`,
+          fileType: 'pdf',
+        }
+      });
+    }
+
+    // Update audit status to indicate report is pending Chief Auditor approval
+    await this.prisma.audit.update({
+      where: { id: auditId },
+      data: { status: 'Pending Chief Auditor Approval' }
+    });
+
+    // Notify all Chief Auditors to preview and approve the report
+    const chiefAuditors = await this.prisma.user.findMany({
+      where: {
+        userRoles: {
+          some: {
+            role: {
+              roleName: { in: ['Chief Auditor'] }
+            }
+          }
+        }
+      }
+    });
+
+    for (const chiefAuditor of chiefAuditors) {
+      await this.notificationService.create({
+        userId: chiefAuditor.id,
+        title: 'Audit Report Pending Approval',
+        message: `The audit report for '${audit.auditName}' has been saved by ${user.name || 'a Manager'} and is awaiting your approval.`,
+        type: 'action_required',
+        link: `/reports/audit/${auditId}/preview`,
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Report saved successfully. Chief Auditor has been notified for approval.',
+      report,
+    };
   }
 }
 

@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AuditWorkflowService = exports.AuditStatus = void 0;
+exports.AuditWorkflowService = exports.CAE_COMMENT_REQUIRED_TRANSITIONS = exports.AuditStatus = void 0;
 const common_1 = require("@nestjs/common");
 const notification_service_1 = require("../notification/notification.service");
 var AuditStatus;
@@ -19,29 +19,30 @@ var AuditStatus;
     AuditStatus["REJECTED"] = "Rejected";
     AuditStatus["IN_PROGRESS"] = "In Progress";
     AuditStatus["UNDER_REVIEW"] = "Under Review";
-    AuditStatus["EXECUTION_FINISHED"] = "Execution Finished";
     AuditStatus["FINALIZED"] = "Finalized";
-    AuditStatus["PROCESS_OWNER_REVIEW"] = "Process Owner Review";
-    AuditStatus["REVIEWED_BY_OWNER"] = "Reviewed by Owner";
     AuditStatus["CLOSED"] = "Closed";
 })(AuditStatus || (exports.AuditStatus = AuditStatus = {}));
+exports.CAE_COMMENT_REQUIRED_TRANSITIONS = [
+    { from: 'Planned', to: 'Approved' },
+    { from: 'Planned', to: 'Rejected' },
+];
 let AuditWorkflowService = class AuditWorkflowService {
     notificationService;
     constructor(notificationService) {
         this.notificationService = notificationService;
     }
     validTransitions = {
-        [AuditStatus.PLANNED]: [AuditStatus.APPROVED, AuditStatus.REJECTED, AuditStatus.CLOSED],
-        [AuditStatus.APPROVED]: [AuditStatus.IN_PROGRESS, AuditStatus.CLOSED],
-        [AuditStatus.REJECTED]: [AuditStatus.PLANNED, AuditStatus.CLOSED],
-        [AuditStatus.IN_PROGRESS]: [AuditStatus.UNDER_REVIEW, AuditStatus.CLOSED],
-        [AuditStatus.UNDER_REVIEW]: [AuditStatus.EXECUTION_FINISHED, AuditStatus.IN_PROGRESS],
-        [AuditStatus.EXECUTION_FINISHED]: [AuditStatus.FINALIZED, AuditStatus.UNDER_REVIEW],
-        [AuditStatus.FINALIZED]: [AuditStatus.PROCESS_OWNER_REVIEW, AuditStatus.CLOSED],
-        [AuditStatus.PROCESS_OWNER_REVIEW]: [AuditStatus.REVIEWED_BY_OWNER, AuditStatus.CLOSED],
-        [AuditStatus.REVIEWED_BY_OWNER]: [AuditStatus.CLOSED],
+        [AuditStatus.PLANNED]: [AuditStatus.APPROVED, AuditStatus.REJECTED],
+        [AuditStatus.REJECTED]: [AuditStatus.PLANNED],
+        [AuditStatus.APPROVED]: [AuditStatus.IN_PROGRESS],
+        [AuditStatus.IN_PROGRESS]: [AuditStatus.UNDER_REVIEW],
+        [AuditStatus.UNDER_REVIEW]: [AuditStatus.FINALIZED, AuditStatus.IN_PROGRESS],
+        [AuditStatus.FINALIZED]: [AuditStatus.CLOSED],
         [AuditStatus.CLOSED]: [],
     };
+    requiresCAEComment(fromStatus, toStatus) {
+        return exports.CAE_COMMENT_REQUIRED_TRANSITIONS.some(t => t.from === fromStatus && t.to === toStatus);
+    }
     canTransition(fromStatus, toStatus) {
         const from = fromStatus;
         const to = toStatus;
@@ -54,72 +55,111 @@ let AuditWorkflowService = class AuditWorkflowService {
         const allowedTransitions = this.validTransitions[from] || [];
         return allowedTransitions.includes(to);
     }
-    async handleTransition(auditId, auditName, fromStatus, toStatus, managerId) {
+    async handleTransition(auditId, auditName, fromStatus, toStatus, recipients, caeComment) {
         if (!this.canTransition(fromStatus, toStatus)) {
             throw new common_1.BadRequestException(`Invalid transition from ${fromStatus} to ${toStatus}`);
         }
-        await this.triggerNotification(auditId, auditName, toStatus, managerId);
+        if (this.requiresCAEComment(fromStatus, toStatus) && !caeComment) {
+            throw new common_1.BadRequestException(`Chief Auditor comment is required for transitioning from ${fromStatus} to ${toStatus}`);
+        }
+        await this.triggerNotifications(auditId, auditName, fromStatus, toStatus, recipients, caeComment);
     }
-    async triggerNotification(auditId, auditName, status, managerId) {
-        let title = '';
-        let message = '';
-        let type = 'info';
-        const targetUserId = managerId;
-        switch (status) {
+    async triggerNotifications(auditId, auditName, fromStatus, toStatus, recipients, caeComment) {
+        const link = `/audits/${auditId}`;
+        const notifications = [];
+        switch (toStatus) {
             case AuditStatus.APPROVED:
-                title = 'Audit Approved';
-                message = `The audit "${auditName}" has been approved and is ready to start.`;
-                type = 'success';
+                if (recipients.managerId) {
+                    notifications.push({
+                        userId: recipients.managerId,
+                        title: 'Audit Plan Approved',
+                        message: `The audit "${auditName}" has been approved by the Chief Auditor.${caeComment ? ` Comment: ${caeComment}` : ''}`,
+                        type: 'success',
+                        link,
+                    });
+                }
+                if (recipients.auditorIds) {
+                    for (const auditorId of recipients.auditorIds) {
+                        notifications.push({
+                            userId: auditorId,
+                            title: 'Audit Ready to Start',
+                            message: `The audit "${auditName}" has been approved and is ready for execution.${caeComment ? ` Chief Auditor Comment: ${caeComment}` : ''}`,
+                            type: 'info',
+                            link,
+                        });
+                    }
+                }
                 break;
             case AuditStatus.REJECTED:
-                title = 'Audit Rejected';
-                message = `The audit plan for "${auditName}" has been rejected by the CAE.`;
-                type = 'warning';
+                if (recipients.managerId) {
+                    notifications.push({
+                        userId: recipients.managerId,
+                        title: 'Audit Plan Rejected',
+                        message: `The audit "${auditName}" has been rejected by the Chief Auditor. Feedback: ${caeComment || 'No comment provided'}`,
+                        type: 'warning',
+                        link,
+                    });
+                }
                 break;
             case AuditStatus.IN_PROGRESS:
-                title = 'Audit Started';
-                message = `The audit "${auditName}" is now in progress.`;
-                type = 'info';
+                if (recipients.managerId) {
+                    notifications.push({
+                        userId: recipients.managerId,
+                        title: 'Audit Execution Started',
+                        message: `The audit "${auditName}" is now in progress.`,
+                        type: 'info',
+                        link,
+                    });
+                }
                 break;
             case AuditStatus.UNDER_REVIEW:
-                title = 'Audit Review Needed';
-                message = `The audit "${auditName}" is ready for manager review.`;
-                type = 'action_required';
-                break;
-            case AuditStatus.EXECUTION_FINISHED:
-                title = 'Audit Execution Finished';
-                message = `The execution for "${auditName}" has been confirmed as finished and is ready for CAE review.`;
-                type = 'info';
+                if (recipients.managerId) {
+                    notifications.push({
+                        userId: recipients.managerId,
+                        title: 'Audit Ready for Review',
+                        message: `The audit "${auditName}" has been submitted for your review.`,
+                        type: 'action_required',
+                        link,
+                    });
+                }
                 break;
             case AuditStatus.FINALIZED:
-                title = 'Audit Finalized';
-                message = `The audit "${auditName}" has been finalized by the CAE.`;
-                type = 'success';
-                break;
-            case AuditStatus.PROCESS_OWNER_REVIEW:
-                title = 'Audit Ready for Process Owner Review';
-                message = `The audit "${auditName}" is ready for your review.`;
-                type = 'action_required';
-                break;
-            case AuditStatus.REVIEWED_BY_OWNER:
-                title = 'Audit Reviewed by Process Owner';
-                message = `The audit "${auditName}" has been reviewed by the process owner and is ready for closure.`;
-                type = 'success';
+                if (recipients.auditorIds) {
+                    for (const auditorId of recipients.auditorIds) {
+                        notifications.push({
+                            userId: auditorId,
+                            title: 'Audit Finalized',
+                            message: `The audit "${auditName}" has been finalized by the manager.`,
+                            type: 'success',
+                            link,
+                        });
+                    }
+                }
                 break;
             case AuditStatus.CLOSED:
-                title = 'Audit Closed';
-                message = `The audit "${auditName}" has been officially closed.`;
-                type = 'warning';
+                if (recipients.managerId) {
+                    notifications.push({
+                        userId: recipients.managerId,
+                        title: 'Audit Closed',
+                        message: `The audit "${auditName}" has been closed by the Board. Feedback: ${caeComment || 'No comment provided'}`,
+                        type: 'success',
+                        link,
+                    });
+                }
+                if (recipients.auditorIds) {
+                    for (const auditorId of recipients.auditorIds) {
+                        notifications.push({
+                            userId: auditorId,
+                            title: 'Audit Closed',
+                            message: `The audit "${auditName}" has been officially closed. Board Feedback: ${caeComment || 'No comment provided'}`,
+                            type: 'info',
+                            link,
+                        });
+                    }
+                }
                 break;
         }
-        if (title && targetUserId) {
-            const notification = {
-                userId: targetUserId,
-                title,
-                message,
-                type,
-                link: `/audits/${auditId}`,
-            };
+        for (const notification of notifications) {
             await this.notificationService.create(notification);
         }
     }
@@ -130,41 +170,24 @@ let AuditWorkflowService = class AuditWorkflowService {
     getPermittedRoles(fromStatus, toStatus) {
         const transitions = {
             [AuditStatus.PLANNED]: {
-                [AuditStatus.APPROVED]: ['Chief Audit Executive (CAE)', 'CAE'],
-                [AuditStatus.REJECTED]: ['Chief Audit Executive (CAE)', 'CAE'],
-                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
-            },
-            [AuditStatus.APPROVED]: {
-                [AuditStatus.IN_PROGRESS]: ['Auditor'],
-                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
+                [AuditStatus.APPROVED]: ['Chief Auditor'],
+                [AuditStatus.REJECTED]: ['Chief Auditor'],
             },
             [AuditStatus.REJECTED]: {
                 [AuditStatus.PLANNED]: ['Audit Manager', 'Manager'],
-                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
+            },
+            [AuditStatus.APPROVED]: {
+                [AuditStatus.IN_PROGRESS]: ['Auditor'],
             },
             [AuditStatus.IN_PROGRESS]: {
                 [AuditStatus.UNDER_REVIEW]: ['Auditor'],
-                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
             },
             [AuditStatus.UNDER_REVIEW]: {
-                [AuditStatus.EXECUTION_FINISHED]: ['Audit Manager', 'Manager'],
+                [AuditStatus.FINALIZED]: ['Audit Manager', 'Manager'],
                 [AuditStatus.IN_PROGRESS]: ['Audit Manager', 'Manager'],
             },
-            [AuditStatus.EXECUTION_FINISHED]: {
-                [AuditStatus.FINALIZED]: ['Chief Audit Executive (CAE)', 'CAE'],
-                [AuditStatus.UNDER_REVIEW]: ['Chief Audit Executive (CAE)', 'CAE'],
-                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
-            },
             [AuditStatus.FINALIZED]: {
-                [AuditStatus.PROCESS_OWNER_REVIEW]: ['Audit Manager', 'Manager', 'Chief Audit Executive (CAE)', 'CAE'],
-                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
-            },
-            [AuditStatus.PROCESS_OWNER_REVIEW]: {
-                [AuditStatus.REVIEWED_BY_OWNER]: ['Audit Manager', 'Manager', 'Chief Audit Executive (CAE)', 'CAE'],
-                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
-            },
-            [AuditStatus.REVIEWED_BY_OWNER]: {
-                [AuditStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
+                [AuditStatus.CLOSED]: ['Board Member'],
             },
         };
         return transitions[fromStatus]?.[toStatus] || [];

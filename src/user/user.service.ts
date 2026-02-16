@@ -22,6 +22,13 @@ export class UpdateUserDto {
   mfaEnabled?: boolean;
 }
 
+export class CreateProcessOwnerDto {
+  name: string;
+  email: string;
+  password: string;
+  auditUniverseId: number;
+}
+
 @Injectable()
 export class UserService {
   constructor(private prisma: PrismaService) {}
@@ -232,7 +239,7 @@ export class UserService {
     const roleNames = userRoles.map(ur => ur.role?.roleName);
     const roleSet = new Set(roleNames);
     const isManager = roleSet.has('Audit Manager') || roleSet.has('Manager');
-    const isCAE = roleSet.has('Chief Audit Executive') || roleSet.has('Chief Audit Executive (CAE)') || roleSet.has('CAE');
+    const isCAE = roleSet.has('Chief Auditor');
     const isAuditor = roleSet.has('Auditor');
 
     const tasks: any[] = [];
@@ -340,5 +347,67 @@ export class UserService {
     }
 
     return tasks;
+  }
+
+  /**
+   * Create a Process Owner user and assign them to an Audit Universe
+   */
+  async createProcessOwner(data: CreateProcessOwnerDto): Promise<Omit<User, 'passwordHash'>> {
+    if (!data.name || !data.email || !data.password || !data.auditUniverseId) {
+      throw new BadRequestException('Name, email, password, and auditUniverseId are required');
+    }
+
+    const existingUser = await this.findByEmail(data.email);
+    if (existingUser) {
+      throw new BadRequestException('Email already in use');
+    }
+
+    // Verify the audit universe exists
+    const auditUniverse = await this.prisma.auditUniverse.findUnique({
+      where: { id: data.auditUniverseId },
+    });
+    if (!auditUniverse) {
+      throw new BadRequestException(`Audit Universe with ID ${data.auditUniverseId} not found`);
+    }
+
+    // Get the Process Owner role
+    const processOwnerRole = await this.prisma.role.findUnique({
+      where: { roleName: 'Process Owner' },
+    });
+    if (!processOwnerRole) {
+      throw new BadRequestException('Process Owner role not found');
+    }
+
+    const passwordHash = await this.hashPassword(data.password);
+
+    // Create user with Process Owner role and link to Audit Universe
+    return this.prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        passwordHash: passwordHash,
+        status: 'active',
+        mfaEnabled: false,
+        userRoles: {
+          create: [{
+            roleId: processOwnerRole.id,
+          }],
+        },
+        auditUniverseOwner: {
+          connect: { id: data.auditUniverseId },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        status: true,
+        mfaEnabled: true,
+        createdAt: true,
+        updatedAt: true,
+        userRoles: { include: { role: true } },
+        auditUniverseOwner: true,
+      },
+    });
   }
 }

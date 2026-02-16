@@ -6,13 +6,12 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FindingWorkflowService = exports.FindingSeverity = exports.FindingStatus = void 0;
+exports.FindingWorkflowService = exports.CAE_FINDING_COMMENT_REQUIRED = exports.FindingSeverity = exports.FindingStatus = void 0;
 const common_1 = require("@nestjs/common");
 var FindingStatus;
 (function (FindingStatus) {
     FindingStatus["IDENTIFIED"] = "Identified";
     FindingStatus["VALIDATED"] = "Validated";
-    FindingStatus["REJECTED"] = "Rejected";
     FindingStatus["ACTION_ASSIGNED"] = "Action Assigned";
     FindingStatus["REMEDIATION_IN_PROGRESS"] = "Remediation In Progress";
     FindingStatus["VERIFIED"] = "Verified";
@@ -25,16 +24,22 @@ var FindingSeverity;
     FindingSeverity["MEDIUM"] = "Medium";
     FindingSeverity["LOW"] = "Low";
 })(FindingSeverity || (exports.FindingSeverity = FindingSeverity = {}));
+exports.CAE_FINDING_COMMENT_REQUIRED = [
+    { from: 'Remediation In Progress', to: 'Verified' },
+    { from: 'Verified', to: 'Closed' },
+];
 let FindingWorkflowService = class FindingWorkflowService {
     validTransitions = {
-        [FindingStatus.IDENTIFIED]: [FindingStatus.VALIDATED, FindingStatus.REJECTED],
-        [FindingStatus.VALIDATED]: [FindingStatus.ACTION_ASSIGNED, FindingStatus.REJECTED],
-        [FindingStatus.REJECTED]: [FindingStatus.IDENTIFIED],
+        [FindingStatus.IDENTIFIED]: [FindingStatus.VALIDATED],
+        [FindingStatus.VALIDATED]: [FindingStatus.ACTION_ASSIGNED],
         [FindingStatus.ACTION_ASSIGNED]: [FindingStatus.REMEDIATION_IN_PROGRESS],
-        [FindingStatus.REMEDIATION_IN_PROGRESS]: [FindingStatus.CLOSED, FindingStatus.VERIFIED],
-        [FindingStatus.VERIFIED]: [FindingStatus.CLOSED, FindingStatus.REMEDIATION_IN_PROGRESS],
+        [FindingStatus.REMEDIATION_IN_PROGRESS]: [FindingStatus.VERIFIED],
+        [FindingStatus.VERIFIED]: [FindingStatus.CLOSED],
         [FindingStatus.CLOSED]: [],
     };
+    requiresCAEComment(fromStatus, toStatus) {
+        return exports.CAE_FINDING_COMMENT_REQUIRED.some(t => t.from === fromStatus && t.to === toStatus);
+    }
     canTransition(fromStatus, toStatus) {
         const from = fromStatus;
         const to = toStatus;
@@ -55,24 +60,18 @@ let FindingWorkflowService = class FindingWorkflowService {
         const transitions = {
             [FindingStatus.IDENTIFIED]: {
                 [FindingStatus.VALIDATED]: ['Audit Manager', 'Manager'],
-                [FindingStatus.REJECTED]: ['Audit Manager', 'Manager'],
             },
             [FindingStatus.VALIDATED]: {
-                [FindingStatus.ACTION_ASSIGNED]: ['Chief Audit Executive (CAE)', 'CAE'],
-                [FindingStatus.REJECTED]: ['Chief Audit Executive (CAE)', 'CAE'],
-            },
-            [FindingStatus.REJECTED]: {
-                [FindingStatus.IDENTIFIED]: ['Auditor'],
+                [FindingStatus.ACTION_ASSIGNED]: ['Audit Manager', 'Manager'],
             },
             [FindingStatus.ACTION_ASSIGNED]: {
-                [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Audit Manager', 'Manager', 'Chief Audit Executive (CAE)', 'CAE'],
+                [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Audit Manager', 'Manager', 'Process Owner'],
             },
             [FindingStatus.REMEDIATION_IN_PROGRESS]: {
-                [FindingStatus.VERIFIED]: ['Audit Manager', 'Manager'],
-                [FindingStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
+                [FindingStatus.VERIFIED]: ['Chief Auditor'],
             },
             [FindingStatus.VERIFIED]: {
-                [FindingStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
+                [FindingStatus.CLOSED]: ['Chief Auditor'],
             },
         };
         return transitions[fromStatus]?.[toStatus] || [];

@@ -104,6 +104,7 @@ export declare class FindingController {
     transitionStatus(id: number, body: {
         toStatus: string;
         userRole?: string;
+        comment?: string;
     }): Promise<{
         id: number;
         status: string;

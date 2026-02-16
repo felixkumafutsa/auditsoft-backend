@@ -28,7 +28,7 @@ export declare class FindingService {
     findByAudit(auditId: number): Promise<Finding[]>;
     create(data: CreateFindingDto, user?: any): Promise<Finding>;
     update(id: number, data: UpdateFindingDto): Promise<Finding>;
-    transitionStatus(id: number, toStatus: string, userRole?: string): Promise<Finding>;
+    transitionStatus(id: number, toStatus: string, userRole?: string, caeComment?: string): Promise<Finding>;
     delete(id: number): Promise<Finding>;
     getCriticalFindings(): Promise<Finding[]>;
     getOverdueFindings(): Promise<Finding[]>;

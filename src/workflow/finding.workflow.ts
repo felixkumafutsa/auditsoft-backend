@@ -1,10 +1,13 @@
 // src/workflow/finding.workflow.ts
+// Finding Lifecycle: Identified → Validated → Action Assigned → Remediation In Progress → Verified → Closed
+// Auditor identifies, Manager validates, Manager assigns action,
+// (Remediation happens), Chief Auditor verifies (with comment), Chief Auditor closes (with comment)
+
 import { Injectable, BadRequestException } from '@nestjs/common';
 
 export enum FindingStatus {
   IDENTIFIED = 'Identified',
   VALIDATED = 'Validated',
-  REJECTED = 'Rejected',
   ACTION_ASSIGNED = 'Action Assigned',
   REMEDIATION_IN_PROGRESS = 'Remediation In Progress',
   VERIFIED = 'Verified',
@@ -18,17 +21,32 @@ export enum FindingSeverity {
   LOW = 'Low',
 }
 
+// Actions that require Chief Auditor comments
+export const CAE_FINDING_COMMENT_REQUIRED = [
+  { from: 'Remediation In Progress', to: 'Verified' },
+  { from: 'Verified', to: 'Closed' },
+];
+
 @Injectable()
 export class FindingWorkflowService {
+  // Strict lifecycle: Identified → Validated → Action Assigned → Remediation In Progress → Verified → Closed
   private readonly validTransitions: Record<FindingStatus, FindingStatus[]> = {
-    [FindingStatus.IDENTIFIED]: [FindingStatus.VALIDATED, FindingStatus.REJECTED],
-    [FindingStatus.VALIDATED]: [FindingStatus.ACTION_ASSIGNED, FindingStatus.REJECTED],
-    [FindingStatus.REJECTED]: [FindingStatus.IDENTIFIED],
+    [FindingStatus.IDENTIFIED]: [FindingStatus.VALIDATED],
+    [FindingStatus.VALIDATED]: [FindingStatus.ACTION_ASSIGNED],
     [FindingStatus.ACTION_ASSIGNED]: [FindingStatus.REMEDIATION_IN_PROGRESS],
-    [FindingStatus.REMEDIATION_IN_PROGRESS]: [FindingStatus.CLOSED, FindingStatus.VERIFIED],
-    [FindingStatus.VERIFIED]: [FindingStatus.CLOSED, FindingStatus.REMEDIATION_IN_PROGRESS],
+    [FindingStatus.REMEDIATION_IN_PROGRESS]: [FindingStatus.VERIFIED],
+    [FindingStatus.VERIFIED]: [FindingStatus.CLOSED],
     [FindingStatus.CLOSED]: [], // Terminal state
   };
+
+  /**
+   * Check if this transition requires Chief Auditor comment
+   */
+  requiresCAEComment(fromStatus: string, toStatus: string): boolean {
+    return CAE_FINDING_COMMENT_REQUIRED.some(
+      t => t.from === fromStatus && t.to === toStatus
+    );
+  }
 
   /**
    * Validate if a state transition is allowed
@@ -59,29 +77,26 @@ export class FindingWorkflowService {
 
   /**
    * Get role-based permissions for status transitions
+   * Auditor: identifies
+   * Manager: validates, assigns action
+   * Chief Auditor: verifies (with comment), closes (with comment)
    */
   getPermittedRoles(fromStatus: string, toStatus: string): string[] {
     const transitions: Record<string, Record<string, string[]>> = {
       [FindingStatus.IDENTIFIED]: {
         [FindingStatus.VALIDATED]: ['Audit Manager', 'Manager'],
-        [FindingStatus.REJECTED]: ['Audit Manager', 'Manager'],
       },
       [FindingStatus.VALIDATED]: {
-        [FindingStatus.ACTION_ASSIGNED]: ['Chief Audit Executive (CAE)', 'CAE'],
-        [FindingStatus.REJECTED]: ['Chief Audit Executive (CAE)', 'CAE'],
-      },
-      [FindingStatus.REJECTED]: {
-        [FindingStatus.IDENTIFIED]: ['Auditor'],
+        [FindingStatus.ACTION_ASSIGNED]: ['Audit Manager', 'Manager'],
       },
       [FindingStatus.ACTION_ASSIGNED]: {
-        [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Audit Manager', 'Manager', 'Chief Audit Executive (CAE)', 'CAE'],
+        [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Audit Manager', 'Manager', 'Process Owner'],
       },
       [FindingStatus.REMEDIATION_IN_PROGRESS]: {
-        [FindingStatus.VERIFIED]: ['Audit Manager', 'Manager'],
-        [FindingStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
+        [FindingStatus.VERIFIED]: ['Chief Auditor'],
       },
       [FindingStatus.VERIFIED]: {
-        [FindingStatus.CLOSED]: ['Chief Audit Executive (CAE)', 'CAE'],
+        [FindingStatus.CLOSED]: ['Chief Auditor'],
       },
     };
 

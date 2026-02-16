@@ -1,19 +1,22 @@
+// src/workflow/evidence.workflow.ts
+// Evidence Lifecycle: Uploaded → Reviewed → Approved → Archived
+// Auditor uploads, Manager reviews, Manager approves, Manager archives
+
 import { Injectable, BadRequestException } from '@nestjs/common';
 
 export enum EvidenceStatus {
   UPLOADED = 'Uploaded',
   REVIEWED = 'Reviewed',
-  REJECTED = 'Rejected',
   APPROVED = 'Approved',
   ARCHIVED = 'Archived',
 }
 
 @Injectable()
 export class EvidenceWorkflowService {
+  // Strict lifecycle: Uploaded → Reviewed → Approved → Archived
   private readonly validTransitions: Record<EvidenceStatus, EvidenceStatus[]> = {
-    [EvidenceStatus.UPLOADED]: [EvidenceStatus.REVIEWED, EvidenceStatus.REJECTED, EvidenceStatus.ARCHIVED],
-    [EvidenceStatus.REVIEWED]: [EvidenceStatus.APPROVED, EvidenceStatus.REJECTED, EvidenceStatus.UPLOADED],
-    [EvidenceStatus.REJECTED]: [EvidenceStatus.UPLOADED], // Re-upload after rejection
+    [EvidenceStatus.UPLOADED]: [EvidenceStatus.REVIEWED],
+    [EvidenceStatus.REVIEWED]: [EvidenceStatus.APPROVED, EvidenceStatus.UPLOADED], // Can reject back to re-upload
     [EvidenceStatus.APPROVED]: [EvidenceStatus.ARCHIVED],
     [EvidenceStatus.ARCHIVED]: [], // Terminal state
   };
@@ -47,22 +50,20 @@ export class EvidenceWorkflowService {
 
   /**
    * Get role-based permissions for status transitions
+   * Auditor: uploads
+   * Manager: reviews, approves, archives
    */
   getPermittedRoles(fromStatus: string, toStatus: string): string[] {
     const transitions: Record<string, Record<string, string[]>> = {
       [EvidenceStatus.UPLOADED]: {
-        [EvidenceStatus.REVIEWED]: ['Audit Manager', 'Manager', 'Chief Audit Executive (CAE)', 'CAE', 'Admin', 'System Administrator'],
-        [EvidenceStatus.REJECTED]: ['Audit Manager', 'Manager', 'Chief Audit Executive (CAE)', 'CAE', 'Admin', 'System Administrator'],
+        [EvidenceStatus.REVIEWED]: ['Audit Manager', 'Manager'],
       },
       [EvidenceStatus.REVIEWED]: {
-        [EvidenceStatus.APPROVED]: ['Chief Audit Executive (CAE)', 'CAE', 'Admin', 'System Administrator'],
-        [EvidenceStatus.REJECTED]: ['Chief Audit Executive (CAE)', 'CAE', 'Admin', 'System Administrator'],
-      },
-      [EvidenceStatus.REJECTED]: {
-        [EvidenceStatus.UPLOADED]: ['Auditor'],
+        [EvidenceStatus.APPROVED]: ['Audit Manager', 'Manager'],
+        [EvidenceStatus.UPLOADED]: ['Audit Manager', 'Manager'], // Reject back for re-upload
       },
       [EvidenceStatus.APPROVED]: {
-        [EvidenceStatus.ARCHIVED]: ['Chief Audit Executive (CAE)', 'CAE', 'Admin', 'System Administrator'],
+        [EvidenceStatus.ARCHIVED]: ['Audit Manager', 'Manager'],
       },
     };
 

@@ -53,7 +53,7 @@ let FindingController = class FindingController {
         return this.findingService.delete(id);
     }
     async transitionStatus(id, body) {
-        return this.findingService.transitionStatus(id, body.toStatus, body.userRole);
+        return this.findingService.transitionStatus(id, body.toStatus, body.userRole, body.comment);
     }
     getAllowedTransitions(id) {
         return this.findingService.findOne(id).then((finding) => ({

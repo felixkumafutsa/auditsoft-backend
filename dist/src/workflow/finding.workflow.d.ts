@@ -1,7 +1,6 @@
 export declare enum FindingStatus {
     IDENTIFIED = "Identified",
     VALIDATED = "Validated",
-    REJECTED = "Rejected",
     ACTION_ASSIGNED = "Action Assigned",
     REMEDIATION_IN_PROGRESS = "Remediation In Progress",
     VERIFIED = "Verified",
@@ -13,8 +12,13 @@ export declare enum FindingSeverity {
     MEDIUM = "Medium",
     LOW = "Low"
 }
+export declare const CAE_FINDING_COMMENT_REQUIRED: {
+    from: string;
+    to: string;
+}[];
 export declare class FindingWorkflowService {
     private readonly validTransitions;
+    requiresCAEComment(fromStatus: string, toStatus: string): boolean;
     canTransition(fromStatus: string, toStatus: string): boolean;
     getAllowedTransitions(currentStatus: string): FindingStatus[];
     getPermittedRoles(fromStatus: string, toStatus: string): string[];

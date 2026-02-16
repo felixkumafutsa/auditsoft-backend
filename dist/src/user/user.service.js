@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserService = exports.UpdateUserDto = exports.CreateUserDto = void 0;
+exports.UserService = exports.CreateProcessOwnerDto = exports.UpdateUserDto = exports.CreateUserDto = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const crypto_1 = require("crypto");
@@ -31,6 +31,13 @@ class UpdateUserDto {
     mfaEnabled;
 }
 exports.UpdateUserDto = UpdateUserDto;
+class CreateProcessOwnerDto {
+    name;
+    email;
+    password;
+    auditUniverseId;
+}
+exports.CreateProcessOwnerDto = CreateProcessOwnerDto;
 let UserService = class UserService {
     prisma;
     constructor(prisma) {
@@ -212,7 +219,7 @@ let UserService = class UserService {
         const roleNames = userRoles.map(ur => ur.role?.roleName);
         const roleSet = new Set(roleNames);
         const isManager = roleSet.has('Audit Manager') || roleSet.has('Manager');
-        const isCAE = roleSet.has('Chief Audit Executive') || roleSet.has('Chief Audit Executive (CAE)') || roleSet.has('CAE');
+        const isCAE = roleSet.has('Chief Auditor');
         const isAuditor = roleSet.has('Auditor');
         const tasks = [];
         if (isAuditor) {
@@ -317,6 +324,56 @@ let UserService = class UserService {
             }
         }
         return tasks;
+    }
+    async createProcessOwner(data) {
+        if (!data.name || !data.email || !data.password || !data.auditUniverseId) {
+            throw new common_1.BadRequestException('Name, email, password, and auditUniverseId are required');
+        }
+        const existingUser = await this.findByEmail(data.email);
+        if (existingUser) {
+            throw new common_1.BadRequestException('Email already in use');
+        }
+        const auditUniverse = await this.prisma.auditUniverse.findUnique({
+            where: { id: data.auditUniverseId },
+        });
+        if (!auditUniverse) {
+            throw new common_1.BadRequestException(`Audit Universe with ID ${data.auditUniverseId} not found`);
+        }
+        const processOwnerRole = await this.prisma.role.findUnique({
+            where: { roleName: 'Process Owner' },
+        });
+        if (!processOwnerRole) {
+            throw new common_1.BadRequestException('Process Owner role not found');
+        }
+        const passwordHash = await this.hashPassword(data.password);
+        return this.prisma.user.create({
+            data: {
+                name: data.name,
+                email: data.email,
+                passwordHash: passwordHash,
+                status: 'active',
+                mfaEnabled: false,
+                userRoles: {
+                    create: [{
+                            roleId: processOwnerRole.id,
+                        }],
+                },
+                auditUniverseOwner: {
+                    connect: { id: data.auditUniverseId },
+                },
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                status: true,
+                mfaEnabled: true,
+                createdAt: true,
+                updatedAt: true,
+                userRoles: { include: { role: true } },
+                auditUniverseOwner: true,
+            },
+        });
     }
 };
 exports.UserService = UserService;

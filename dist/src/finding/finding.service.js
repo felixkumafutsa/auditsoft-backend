@@ -118,13 +118,13 @@ let FindingService = class FindingService {
             },
         });
     }
-    async transitionStatus(id, toStatus, userRole) {
+    async transitionStatus(id, toStatus, userRole, caeComment) {
         const finding = await this.findOne(id);
         const currentStatus = finding.status;
         const normalizedToStatus = toStatus.trim();
         const normalizedUserRole = userRole?.trim();
         const audit = await this.auditService.findOne(finding.auditId);
-        const allowedAuditStatuses = ['In Progress', 'Under Review', 'Execution Finished', 'Finalized', 'Process Owner Review'];
+        const allowedAuditStatuses = ['In Progress', 'Under Review', 'Finalized'];
         if (!allowedAuditStatuses.includes(audit.status)) {
             throw new common_1.BadRequestException(`Finding status cannot be changed when audit is in '${audit.status}' status.`);
         }
@@ -137,60 +137,20 @@ let FindingService = class FindingService {
                 throw new common_1.BadRequestException(`Role ${normalizedUserRole} is not permitted to transition from ${currentStatus} to ${normalizedToStatus}`);
             }
         }
+        if (this.workflowService.requiresCAEComment(currentStatus, normalizedToStatus) && !caeComment) {
+            throw new common_1.BadRequestException(`CAE comment is required for transitioning from ${currentStatus} to ${normalizedToStatus}`);
+        }
         const updatedFinding = await this.update(id, { status: normalizedToStatus });
         try {
-            const audit = await this.auditService.findOne(updatedFinding.auditId);
             const link = `/audits/${updatedFinding.auditId}`;
-            const findingTitle = `Finding: ${updatedFinding.description.substring(0, 30)}...`;
-            if (toStatus === 'Rejected') {
-                for (const auditor of audit.assignedAuditors) {
-                    await this.notificationService.create({
-                        userId: auditor.id,
-                        title: 'Finding Rejected',
-                        message: `A finding in audit '${audit.auditName}' was rejected by the manager.`,
-                        type: 'warning',
-                        link
-                    });
-                }
-            }
-            if (currentStatus === 'Identified' && toStatus === 'Validated') {
-                if (audit.assignedManagerId) {
-                    await this.notificationService.create({
-                        userId: audit.assignedManagerId,
-                        title: 'Finding Validated',
-                        message: `A finding in audit '${audit.auditName}' has been validated and requires attention.`,
-                        type: 'info',
-                        link
-                    });
-                }
-            }
-            if (currentStatus === 'Validated' && toStatus === 'Action Assigned') {
-                for (const auditor of audit.assignedAuditors) {
-                    await this.notificationService.create({
-                        userId: auditor.id,
-                        title: 'Action Plan Assigned',
-                        message: `Action plan assigned for finding in '${audit.auditName}'.`,
-                        type: 'info',
-                        link
-                    });
-                }
-                if (audit.assignedManagerId) {
-                    await this.notificationService.create({
-                        userId: audit.assignedManagerId,
-                        title: 'Action Plan Required',
-                        message: `A finding in '${audit.auditName}' requires an action plan.`,
-                        type: 'action_required',
-                        link
-                    });
-                }
-            }
-            if (currentStatus === 'Remediation In Progress' && toStatus === 'Verified') {
+            const findingDesc = updatedFinding.description.substring(0, 50);
+            if (currentStatus === 'Identified' && normalizedToStatus === 'Validated') {
                 const caes = await this.prisma.user.findMany({
                     where: {
                         userRoles: {
                             some: {
                                 role: {
-                                    roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+                                    roleName: { in: ['Chief Auditor'] }
                                 }
                             }
                         }
@@ -199,9 +159,60 @@ let FindingService = class FindingService {
                 for (const cae of caes) {
                     await this.notificationService.create({
                         userId: cae.id,
-                        title: 'Finding Verified',
-                        message: `A finding in audit '${audit.auditName}' has been verified. Closing is pending.`,
-                        type: 'action_required',
+                        title: 'Finding Validated',
+                        message: `Finding "${findingDesc}..." in audit '${audit.auditName}' has been validated by the manager.`,
+                        type: 'info',
+                        link
+                    });
+                }
+            }
+            if (currentStatus === 'Validated' && normalizedToStatus === 'Action Assigned') {
+                for (const auditor of audit.assignedAuditors || []) {
+                    await this.notificationService.create({
+                        userId: auditor.id,
+                        title: 'Action Assigned to Finding',
+                        message: `An action plan has been assigned for finding "${findingDesc}..." in '${audit.auditName}'.`,
+                        type: 'info',
+                        link
+                    });
+                }
+            }
+            if (currentStatus === 'Remediation In Progress' && normalizedToStatus === 'Verified') {
+                if (audit.assignedManagerId) {
+                    await this.notificationService.create({
+                        userId: audit.assignedManagerId,
+                        title: 'Finding Verified by CAE',
+                        message: `Finding "${findingDesc}..." has been verified by CAE. Feedback: ${caeComment || 'No comment'}`,
+                        type: 'success',
+                        link
+                    });
+                }
+                for (const auditor of audit.assignedAuditors || []) {
+                    await this.notificationService.create({
+                        userId: auditor.id,
+                        title: 'Finding Verified by CAE',
+                        message: `Finding "${findingDesc}..." has been verified. CAE Feedback: ${caeComment || 'No comment'}`,
+                        type: 'info',
+                        link
+                    });
+                }
+            }
+            if (currentStatus === 'Verified' && normalizedToStatus === 'Closed') {
+                if (audit.assignedManagerId) {
+                    await this.notificationService.create({
+                        userId: audit.assignedManagerId,
+                        title: 'Finding Closed by CAE',
+                        message: `Finding "${findingDesc}..." has been closed by CAE. Feedback: ${caeComment || 'No comment'}`,
+                        type: 'success',
+                        link
+                    });
+                }
+                for (const auditor of audit.assignedAuditors || []) {
+                    await this.notificationService.create({
+                        userId: auditor.id,
+                        title: 'Finding Closed by CAE',
+                        message: `Finding "${findingDesc}..." has been officially closed. CAE Feedback: ${caeComment || 'No comment'}`,
+                        type: 'info',
                         link
                     });
                 }

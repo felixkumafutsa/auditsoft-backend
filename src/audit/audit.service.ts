@@ -143,7 +143,7 @@ export class AuditService {
           userRoles: {
             some: {
               role: {
-                roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+                roleName: { in: ['Chief Auditor'] }
               }
             }
           }
@@ -314,7 +314,7 @@ export class AuditService {
             userRoles: {
               some: {
                 role: {
-                  roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+                  roleName: { in: ['Chief Auditor'] }
                 }
               }
             }
@@ -332,15 +332,18 @@ export class AuditService {
         }
       }
 
-      // Execution Finished -> Finalized: Alert Manager (was Process Owner)
+      // Execution Finished -> Finalized: Generate PDF and Alert Manager to preview/save report
       if (existingAudit.status === 'Execution Finished' && data.status === 'Finalized') {
+        // Generate PDF report when audit is finalized
+        await this.reportsService.generatePDFToFile(updatedAudit.id);
+
         if (updatedAudit.assignedManagerId) {
           await this.notificationService.create({
             userId: updatedAudit.assignedManagerId,
-            title: 'Audit Finalized - Ready for Review',
-            message: `The audit '${auditName}' has been finalized and is ready for your review.`,
+            title: 'Audit Report Ready for Review',
+            message: `The audit '${auditName}' has been finalized. Please preview and save the report for CAE approval.`,
             type: 'action_required',
-            link: auditLink
+            link: `/reports/audit/${updatedAudit.id}/preview`
           });
         }
       }
@@ -352,7 +355,7 @@ export class AuditService {
             userRoles: {
               some: {
                 role: {
-                  roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+                  roleName: { in: ['Chief Auditor'] }
                 }
               }
             }
@@ -370,10 +373,8 @@ export class AuditService {
         }
       }
 
-      // Process Owner Review -> Closed: Generate report and notify
+      // Closed: Notify manager and auditors (report already generated at Finalized)
       if (data.status === 'Closed') {
-        await this.reportsService.generatePDFToFile(updatedAudit.id);
-
         if (updatedAudit.assignedManagerId) {
           await this.notificationService.create({
             userId: updatedAudit.assignedManagerId,

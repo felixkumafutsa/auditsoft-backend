@@ -135,7 +135,7 @@ let AuditService = class AuditService {
                     userRoles: {
                         some: {
                             role: {
-                                roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+                                roleName: { in: ['Chief Auditor'] }
                             }
                         }
                     }
@@ -266,7 +266,7 @@ let AuditService = class AuditService {
                         userRoles: {
                             some: {
                                 role: {
-                                    roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+                                    roleName: { in: ['Chief Auditor'] }
                                 }
                             }
                         }
@@ -283,13 +283,14 @@ let AuditService = class AuditService {
                 }
             }
             if (existingAudit.status === 'Execution Finished' && data.status === 'Finalized') {
+                await this.reportsService.generatePDFToFile(updatedAudit.id);
                 if (updatedAudit.assignedManagerId) {
                     await this.notificationService.create({
                         userId: updatedAudit.assignedManagerId,
-                        title: 'Audit Finalized - Ready for Review',
-                        message: `The audit '${auditName}' has been finalized and is ready for your review.`,
+                        title: 'Audit Report Ready for Review',
+                        message: `The audit '${auditName}' has been finalized. Please preview and save the report for CAE approval.`,
                         type: 'action_required',
-                        link: auditLink
+                        link: `/reports/audit/${updatedAudit.id}/preview`
                     });
                 }
             }
@@ -299,7 +300,7 @@ let AuditService = class AuditService {
                         userRoles: {
                             some: {
                                 role: {
-                                    roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
+                                    roleName: { in: ['Chief Auditor'] }
                                 }
                             }
                         }
@@ -316,7 +317,6 @@ let AuditService = class AuditService {
                 }
             }
             if (data.status === 'Closed') {
-                await this.reportsService.generatePDFToFile(updatedAudit.id);
                 if (updatedAudit.assignedManagerId) {
                     await this.notificationService.create({
                         userId: updatedAudit.assignedManagerId,

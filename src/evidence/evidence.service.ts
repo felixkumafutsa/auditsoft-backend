@@ -287,56 +287,43 @@ export class EvidenceService {
       const auditName = audit.auditName;
       const link = `/audits/${audit.id}`; // Or evidence specific link
 
-      // Reviewed: Notify CAE to approve
+      // Reviewed: Notify Manager (who reviews and approves evidence)
       if (status === EvidenceStatus.REVIEWED) {
-        const caes = await this.prisma.user.findMany({
-          where: {
-            userRoles: {
-              some: {
-                role: {
-                  roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
-                }
-              }
-            }
-          }
-        });
-        for (const cae of caes) {
+        if (audit.assignedManagerId) {
           await this.notificationService.create({
-            userId: cae.id,
-            title: 'Evidence Reviewed',
-            message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' is ready for approval.`,
+            userId: audit.assignedManagerId,
+            title: 'Evidence Ready for Review',
+            message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' has been uploaded and is ready for your review.`,
             type: 'action_required',
             link
           });
         }
       }
 
-      // Approved: Notify CAE to archive
+      // Approved: Notify Auditor that evidence is approved
       if (status === EvidenceStatus.APPROVED) {
-        const caes = await this.prisma.user.findMany({
-          where: {
-            userRoles: {
-              some: {
-                role: {
-                  roleName: { in: ['CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
-                }
-              }
-            }
-          }
+        await this.notificationService.create({
+          userId: updatedEvidence.uploadedById,
+          title: 'Evidence Approved',
+          message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' has been approved by the Manager.`,
+          type: 'success',
+          link
         });
-        for (const cae of caes) {
-          await this.notificationService.create({
-            userId: cae.id,
-            title: 'Evidence Approved',
-            message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' has been approved. Archiving is pending.`,
-            type: 'info',
-            link
-          });
-        }
+      }
+
+      // Archived: Notify Auditor that evidence is archived
+      if (status === EvidenceStatus.ARCHIVED) {
+        await this.notificationService.create({
+          userId: updatedEvidence.uploadedById,
+          title: 'Evidence Archived',
+          message: `Evidence '${updatedEvidence.fileName}' in '${auditName}' has been archived by the Manager.`,
+          type: 'info',
+          link
+        });
       }
 
       // Rejected: Notify Uploader
-      if (status === EvidenceStatus.REJECTED) {
+      if (status === EvidenceStatus.UPLOADED) {
         await this.notificationService.create({
           userId: updatedEvidence.uploadedById,
           title: 'Evidence Rejected',

@@ -1,13 +1,15 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
-import { UserService, CreateUserDto, UpdateUserDto } from './user.service';
+import { UserService, CreateUserDto, UpdateUserDto, CreateProcessOwnerDto } from './user.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('users')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class UserController {
   constructor(private userService: UserService) { }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
   getProfile(@Request() req) {
     return this.userService.findOne(req.user.id);
   }
@@ -57,6 +59,12 @@ export class UserController {
     @Param('roleId', ParseIntPipe) roleId: number,
   ) {
     return this.userService.removeRole(userId, roleId);
+  }
+
+  @Post('process-owner')
+  @Roles('System Administrator')
+  createProcessOwner(@Body() data: CreateProcessOwnerDto) {
+    return this.userService.createProcessOwner(data);
   }
 
   @Get(':userId/roles')

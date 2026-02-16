@@ -59,10 +59,10 @@ export class AuditController {
     if (body.status === 'Approved') {
       const user = req.user;
       const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
-      const isCAE = roles.includes('Chief Audit Executive (CAE)') || roles.includes('CAE') || roles.includes('Chief Audit Executive');
+      const isChiefAuditor = roles.includes('Chief Auditor');
       
-      if (!isCAE) {
-        throw new ForbiddenException('Only Chief Audit Executive can approve audits.');
+      if (!isChiefAuditor) {
+        throw new ForbiddenException('Only Chief Auditor can approve audits.');
       }
     }
     return this.auditService.update(id, body);

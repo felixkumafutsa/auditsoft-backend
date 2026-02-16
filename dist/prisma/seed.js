@@ -18,7 +18,7 @@ async function main() {
             description: 'Full system configuration and user management.',
         },
         {
-            roleName: 'Chief Audit Executive (CAE)',
+            roleName: 'Chief Auditor',
             description: 'Views all reports, approves audit plans, and holds escalation authority.',
         },
         {
@@ -34,7 +34,7 @@ async function main() {
             description: 'Views assigned findings, submits remediation evidence, and responds to auditors.',
         },
         {
-            roleName: 'Executive / Board Viewer',
+            roleName: 'Board Member',
             description: 'Read-only access to dashboards and executive reports.',
         },
     ];
@@ -73,28 +73,28 @@ async function main() {
             console.log(`Default user 'admin@example.com' created with password 'password'`);
         }
     }
-    const executiveRole = await prisma.role.findUnique({
-        where: { roleName: 'Chief Audit Executive (CAE)' },
+    const caeRole = await prisma.role.findUnique({
+        where: { roleName: 'Chief Auditor' },
     });
-    if (executiveRole) {
-        let executiveUser = await prisma.user.findUnique({
-            where: { email: 'executive@example.com' },
+    if (caeRole) {
+        let caeUser = await prisma.user.findUnique({
+            where: { email: 'chief.auditor@example.com' },
         });
-        if (!executiveUser) {
+        if (!caeUser) {
             const passwordHash = await hashPassword('password');
             const user = await prisma.user.create({
                 data: {
-                    name: 'Executive User',
-                    email: 'executive@example.com',
+                    name: 'Chief Auditor',
+                    email: 'chief.auditor@example.com',
                     passwordHash: passwordHash,
                     userRoles: {
                         create: [{
-                                roleId: executiveRole.id,
+                                roleId: caeRole.id,
                             }],
                     },
                 },
             });
-            console.log(`Executive user 'executive@example.com' created with password 'password'`);
+            console.log(`Chief Auditor 'chief.auditor@example.com' created with password 'password'`);
         }
     }
     const auditorRole = await prisma.role.findUnique({

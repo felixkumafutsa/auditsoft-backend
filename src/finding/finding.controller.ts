@@ -83,12 +83,13 @@ export class FindingController {
   @Post(':id/transition')
   async transitionStatus(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { toStatus: string; userRole?: string },
+    @Body() body: { toStatus: string; userRole?: string; comment?: string },
   ) {
     return this.findingService.transitionStatus(
       id,
       body.toStatus,
       body.userRole,
+      body.comment,
     );
   }
 
