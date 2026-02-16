@@ -35,4 +35,5 @@ export declare class AuditService {
     create(data: CreateAuditDto, user?: any): Promise<Audit>;
     update(id: number, data: UpdateAuditDto, user?: any): Promise<Audit>;
     delete(id: number): Promise<Audit>;
+    updateChiefAuditorComments(auditId: number, comments: string): Promise<void>;
 }

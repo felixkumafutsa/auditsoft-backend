@@ -91,6 +91,10 @@ let AuditController = class AuditController {
             allowedTransitions: this.workflowService.getAllowedTransitions(audit.status),
         }));
     }
+    async saveChiefAuditorComments(id, commentsDto) {
+        await this.auditService.updateChiefAuditorComments(id, commentsDto.comments);
+        return { message: 'Chief Auditor comments saved successfully' };
+    }
 };
 exports.AuditController = AuditController;
 __decorate([
@@ -185,6 +189,15 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], AuditController.prototype, "getAllowedTransitions", null);
+__decorate([
+    (0, common_1.Post)(':id/chief-auditor-comments'),
+    (0, common_1.HttpCode)(200),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", Promise)
+], AuditController.prototype, "saveChiefAuditorComments", null);
 exports.AuditController = AuditController = __decorate([
     (0, common_1.Controller)('audits'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),

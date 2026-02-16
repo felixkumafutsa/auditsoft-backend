@@ -45,9 +45,9 @@ let FindingService = class FindingService {
     async findAll() {
         return this.prisma.finding.findMany({
             include: {
-                audit: true,
                 auditProgram: true,
                 actionPlans: true,
+                audit: true
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -118,11 +118,14 @@ let FindingService = class FindingService {
             },
         });
     }
-    async transitionStatus(id, toStatus, userRole, caeComment) {
+    async transitionStatus(id, toStatus, userRole, chiefAuditorComment) {
         const finding = await this.findOne(id);
         const currentStatus = finding.status;
         const normalizedToStatus = toStatus.trim();
         const normalizedUserRole = userRole?.trim();
+        if (!finding.auditId) {
+            throw new common_1.BadRequestException('Finding must be associated with an audit to change status.');
+        }
         const audit = await this.auditService.findOne(finding.auditId);
         const allowedAuditStatuses = ['In Progress', 'Under Review', 'Finalized'];
         if (!allowedAuditStatuses.includes(audit.status)) {
@@ -137,15 +140,18 @@ let FindingService = class FindingService {
                 throw new common_1.BadRequestException(`Role ${normalizedUserRole} is not permitted to transition from ${currentStatus} to ${normalizedToStatus}`);
             }
         }
-        if (this.workflowService.requiresCAEComment(currentStatus, normalizedToStatus) && !caeComment) {
-            throw new common_1.BadRequestException(`CAE comment is required for transitioning from ${currentStatus} to ${normalizedToStatus}`);
+        if (this.workflowService.requiresChiefAuditorComment(currentStatus, normalizedToStatus) && !chiefAuditorComment) {
+            throw new common_1.BadRequestException(`Chief Auditor comment is required for transitioning from ${currentStatus} to ${normalizedToStatus}`);
         }
         const updatedFinding = await this.update(id, { status: normalizedToStatus });
         try {
+            if (!updatedFinding.auditId) {
+                return updatedFinding;
+            }
             const link = `/audits/${updatedFinding.auditId}`;
             const findingDesc = updatedFinding.description.substring(0, 50);
             if (currentStatus === 'Identified' && normalizedToStatus === 'Validated') {
-                const caes = await this.prisma.user.findMany({
+                const chiefAuditors = await this.prisma.user.findMany({
                     where: {
                         userRoles: {
                             some: {
@@ -156,9 +162,9 @@ let FindingService = class FindingService {
                         }
                     }
                 });
-                for (const cae of caes) {
+                for (const chiefAuditor of chiefAuditors) {
                     await this.notificationService.create({
-                        userId: cae.id,
+                        userId: chiefAuditor.id,
                         title: 'Finding Validated',
                         message: `Finding "${findingDesc}..." in audit '${audit.auditName}' has been validated by the manager.`,
                         type: 'info',
@@ -181,8 +187,8 @@ let FindingService = class FindingService {
                 if (audit.assignedManagerId) {
                     await this.notificationService.create({
                         userId: audit.assignedManagerId,
-                        title: 'Finding Verified by CAE',
-                        message: `Finding "${findingDesc}..." has been verified by CAE. Feedback: ${caeComment || 'No comment'}`,
+                        title: 'Finding Verified by Chief Auditor',
+                        message: `Finding "${findingDesc}..." has been verified by Chief Auditor. Feedback: ${chiefAuditorComment || 'No comment'}`,
                         type: 'success',
                         link
                     });
@@ -190,8 +196,8 @@ let FindingService = class FindingService {
                 for (const auditor of audit.assignedAuditors || []) {
                     await this.notificationService.create({
                         userId: auditor.id,
-                        title: 'Finding Verified by CAE',
-                        message: `Finding "${findingDesc}..." has been verified. CAE Feedback: ${caeComment || 'No comment'}`,
+                        title: 'Finding Verified by Chief Auditor',
+                        message: `Finding "${findingDesc}..." has been verified. Chief Auditor Feedback: ${chiefAuditorComment || 'No comment'}`,
                         type: 'info',
                         link
                     });
@@ -201,8 +207,8 @@ let FindingService = class FindingService {
                 if (audit.assignedManagerId) {
                     await this.notificationService.create({
                         userId: audit.assignedManagerId,
-                        title: 'Finding Closed by CAE',
-                        message: `Finding "${findingDesc}..." has been closed by CAE. Feedback: ${caeComment || 'No comment'}`,
+                        title: 'Finding Closed by Chief Auditor',
+                        message: `Finding "${findingDesc}..." has been closed by Chief Auditor. Feedback: ${chiefAuditorComment || 'No comment'}`,
                         type: 'success',
                         link
                     });
@@ -210,8 +216,8 @@ let FindingService = class FindingService {
                 for (const auditor of audit.assignedAuditors || []) {
                     await this.notificationService.create({
                         userId: auditor.id,
-                        title: 'Finding Closed by CAE',
-                        message: `Finding "${findingDesc}..." has been officially closed. CAE Feedback: ${caeComment || 'No comment'}`,
+                        title: 'Finding Closed by Chief Auditor',
+                        message: `Finding "${findingDesc}..." has been officially closed. Chief Auditor Feedback: ${chiefAuditorComment || 'No comment'}`,
                         type: 'info',
                         link
                     });

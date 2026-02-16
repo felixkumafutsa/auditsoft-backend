@@ -12,7 +12,7 @@ export class AuditUniverseController {
   constructor(private readonly auditUniverseService: AuditUniverseService) {}
 
   @Post()
-  @Roles('System Administrator', 'Chief Auditor')
+  @Roles('Chief Auditor')
   create(@Body() createAuditUniverseDto: CreateAuditUniverseDto) {
     return this.auditUniverseService.create(createAuditUniverseDto);
   }
@@ -30,13 +30,13 @@ export class AuditUniverseController {
   }
 
   @Patch(':id')
-  @Roles('System Administrator', 'Chief Auditor')
+  @Roles('Chief Auditor')
   update(@Param('id') id: string, @Body() updateAuditUniverseDto: UpdateAuditUniverseDto) {
     return this.auditUniverseService.update(+id, updateAuditUniverseDto);
   }
 
   @Delete(':id')
-  @Roles('System Administrator', 'Chief Auditor')
+  @Roles('Chief Auditor')
   remove(@Param('id') id: string) {
     return this.auditUniverseService.remove(+id);
   }

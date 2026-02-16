@@ -296,7 +296,7 @@ export class ReportsService {
     const reports = await this.prisma.report.findMany({
       where: {
         audit: {
-          status: { in: ['Finalized', 'Pending Chief Auditor Approval', 'Process Owner Review', 'Closed'] }
+          status: { in: ['Finalized', 'Closed'] }
         }
       },
       include: {
@@ -616,11 +616,7 @@ export class ReportsService {
       });
     }
 
-    // Update audit status to indicate report is pending Chief Auditor approval
-    await this.prisma.audit.update({
-      where: { id: auditId },
-      data: { status: 'Pending Chief Auditor Approval' }
-    });
+    // Report generation no longer changes audit status - audit remains Finalized for Chief Auditor review
 
     // Notify all Chief Auditors to preview and approve the report
     const chiefAuditors = await this.prisma.user.findMany({

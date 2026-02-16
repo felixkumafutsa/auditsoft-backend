@@ -37,9 +37,9 @@ export class FindingService {
   async findAll(): Promise<Finding[]> {
     return this.prisma.finding.findMany({
       include: {
-        audit: true,
         auditProgram: true,
         actionPlans: true,
+        audit: true
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -125,7 +125,7 @@ export class FindingService {
     id: number,
     toStatus: string,
     userRole?: string,
-    caeComment?: string,
+    chiefAuditorComment?: string,
   ): Promise<Finding> {
     const finding = await this.findOne(id);
     const currentStatus = finding.status;
@@ -135,6 +135,9 @@ export class FindingService {
     const normalizedUserRole = userRole?.trim();
 
     // Check if audit allows finding transitions
+    if (!finding.auditId) {
+      throw new BadRequestException('Finding must be associated with an audit to change status.');
+    }
     const audit = await this.auditService.findOne(finding.auditId) as any;
     const allowedAuditStatuses = ['In Progress', 'Under Review', 'Finalized'];
     if (!allowedAuditStatuses.includes(audit.status)) {
@@ -158,24 +161,27 @@ export class FindingService {
       }
     }
 
-    // Validate CAE comment is provided when required
-    if (this.workflowService.requiresCAEComment(currentStatus, normalizedToStatus) && !caeComment) {
+    // Validate Chief Auditor comment is provided when required
+    if (this.workflowService.requiresChiefAuditorComment(currentStatus, normalizedToStatus) && !chiefAuditorComment) {
       throw new BadRequestException(
-        `CAE comment is required for transitioning from ${currentStatus} to ${normalizedToStatus}`,
+        `Chief Auditor comment is required for transitioning from ${currentStatus} to ${normalizedToStatus}`,
       );
     }
 
     const updatedFinding = await this.update(id, { status: normalizedToStatus });
 
-    // --- Send Notifications with CAE feedback ---
+    // --- Send Notifications with Chief Auditor feedback ---
     try {
+      if (!updatedFinding.auditId) {
+        return updatedFinding; // Skip notifications if no audit associated
+      }
       const link = `/audits/${updatedFinding.auditId}`;
       const findingDesc = updatedFinding.description.substring(0, 50);
 
       // Identified -> Validated: Notify Manager
       if (currentStatus === 'Identified' && normalizedToStatus === 'Validated') {
-        // Notify CAE that a finding needs attention
-        const caes = await this.prisma.user.findMany({
+        // Notify Chief Auditor that a finding needs attention
+        const chiefAuditors = await this.prisma.user.findMany({
           where: {
             userRoles: {
               some: {
@@ -186,9 +192,9 @@ export class FindingService {
             }
           }
         });
-        for (const cae of caes) {
+        for (const chiefAuditor of chiefAuditors) {
           await this.notificationService.create({
-            userId: cae.id,
+            userId: chiefAuditor.id,
             title: 'Finding Validated',
             message: `Finding "${findingDesc}..." in audit '${audit.auditName}' has been validated by the manager.`,
             type: 'info',
@@ -210,14 +216,14 @@ export class FindingService {
         }
       }
 
-      // Remediation In Progress -> Verified: CAE verifies with comment, notify Manager and Auditor
+      // Remediation In Progress -> Verified: Chief Auditor verifies with comment, notify Manager and Auditor
       if (currentStatus === 'Remediation In Progress' && normalizedToStatus === 'Verified') {
         // Notify Manager
         if (audit.assignedManagerId) {
           await this.notificationService.create({
             userId: audit.assignedManagerId,
-            title: 'Finding Verified by CAE',
-            message: `Finding "${findingDesc}..." has been verified by CAE. Feedback: ${caeComment || 'No comment'}`,
+            title: 'Finding Verified by Chief Auditor',
+            message: `Finding "${findingDesc}..." has been verified by Chief Auditor. Feedback: ${chiefAuditorComment || 'No comment'}`,
             type: 'success',
             link
           });
@@ -226,22 +232,22 @@ export class FindingService {
         for (const auditor of audit.assignedAuditors || []) {
           await this.notificationService.create({
             userId: auditor.id,
-            title: 'Finding Verified by CAE',
-            message: `Finding "${findingDesc}..." has been verified. CAE Feedback: ${caeComment || 'No comment'}`,
+            title: 'Finding Verified by Chief Auditor',
+            message: `Finding "${findingDesc}..." has been verified. Chief Auditor Feedback: ${chiefAuditorComment || 'No comment'}`,
             type: 'info',
             link
           });
         }
       }
 
-      // Verified -> Closed: CAE closes with comment, notify Manager and Auditor
+      // Verified -> Closed: Chief Auditor closes with comment, notify Manager and Auditor
       if (currentStatus === 'Verified' && normalizedToStatus === 'Closed') {
         // Notify Manager
         if (audit.assignedManagerId) {
           await this.notificationService.create({
             userId: audit.assignedManagerId,
-            title: 'Finding Closed by CAE',
-            message: `Finding "${findingDesc}..." has been closed by CAE. Feedback: ${caeComment || 'No comment'}`,
+            title: 'Finding Closed by Chief Auditor',
+            message: `Finding "${findingDesc}..." has been closed by Chief Auditor. Feedback: ${chiefAuditorComment || 'No comment'}`,
             type: 'success',
             link
           });
@@ -250,8 +256,8 @@ export class FindingService {
         for (const auditor of audit.assignedAuditors || []) {
           await this.notificationService.create({
             userId: auditor.id,
-            title: 'Finding Closed by CAE',
-            message: `Finding "${findingDesc}..." has been officially closed. CAE Feedback: ${caeComment || 'No comment'}`,
+            title: 'Finding Closed by Chief Auditor',
+            message: `Finding "${findingDesc}..." has been officially closed. Chief Auditor Feedback: ${chiefAuditorComment || 'No comment'}`,
             type: 'info',
             link
           });

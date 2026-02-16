@@ -187,7 +187,7 @@ let AuditWorkflowService = class AuditWorkflowService {
                 [AuditStatus.IN_PROGRESS]: ['Audit Manager', 'Manager'],
             },
             [AuditStatus.FINALIZED]: {
-                [AuditStatus.CLOSED]: ['Board Member'],
+                [AuditStatus.CLOSED]: ['Chief Auditor'],
             },
         };
         return transitions[fromStatus]?.[toStatus] || [];

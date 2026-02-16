@@ -247,7 +247,7 @@ export class AuditWorkflowService {
         [AuditStatus.IN_PROGRESS]: ['Audit Manager', 'Manager'], // Send back for rework
       },
       [AuditStatus.FINALIZED]: {
-        [AuditStatus.CLOSED]: ['Board Member'],
+        [AuditStatus.CLOSED]: ['Chief Auditor'], // Chief Auditor approves at finalization
       },
     };
 

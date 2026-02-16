@@ -17,7 +17,7 @@ export class IntegrationController {
   }
 
   @Get()
-  @Roles('Admin', 'System Admin', 'System Administrator', 'CAE', 'Manager')
+  @Roles('Admin', 'System Admin', 'System Administrator', 'Chief Auditor', 'Manager')
   findAll() {
     return this.integrationService.findAll();
   }

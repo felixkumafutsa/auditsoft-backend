@@ -22,7 +22,7 @@ export enum FindingSeverity {
 }
 
 // Actions that require Chief Auditor comments
-export const CAE_FINDING_COMMENT_REQUIRED = [
+export const CHIEF_AUDITOR_FINDING_COMMENT_REQUIRED = [
   { from: 'Remediation In Progress', to: 'Verified' },
   { from: 'Verified', to: 'Closed' },
 ];
@@ -42,8 +42,8 @@ export class FindingWorkflowService {
   /**
    * Check if this transition requires Chief Auditor comment
    */
-  requiresCAEComment(fromStatus: string, toStatus: string): boolean {
-    return CAE_FINDING_COMMENT_REQUIRED.some(
+  requiresChiefAuditorComment(fromStatus: string, toStatus: string): boolean {
+    return CHIEF_AUDITOR_FINDING_COMMENT_REQUIRED.some(
       t => t.from === fromStatus && t.to === toStatus
     );
   }

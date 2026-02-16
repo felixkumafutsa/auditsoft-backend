@@ -10,14 +10,13 @@ export class WorkflowController {
   constructor(private readonly auditWorkflow: AuditWorkflowService) {}
 
   @Get('audit/config')
-  @Roles('Admin', 'System Administrator', 'CAE')
+  @Roles('Admin', 'System Administrator', 'Chief Auditor')
   getAuditWorkflowConfig() {
     // Expose the internal structure for UI representation
     return {
       statuses: [
         'Planned', 'Approved', 'Rejected', 'In Progress', 
-        'Under Review', 'Execution Finished', 'Finalized', 
-        'Process Owner Review', 'Closed'
+        'Under Review', 'Finalized', 'Closed'
       ],
       transitions: (this.auditWorkflow as any).validTransitions,
       // We could add more here as needed

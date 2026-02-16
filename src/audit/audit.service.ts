@@ -307,50 +307,13 @@ export class AuditService {
         }
       }
 
-      // Under Review -> Execution Finished: Alert CAE
-      if (existingAudit.status === 'Under Review' && data.status === 'Execution Finished') {
-        const caes = await this.prisma.user.findMany({
-          where: {
-            userRoles: {
-              some: {
-                role: {
-                  roleName: { in: ['Chief Auditor'] }
-                }
-              }
-            }
-          }
-        });
-
-        for (const cae of caes) {
-          await this.notificationService.create({
-            userId: cae.id,
-            title: 'Audit Execution Finished',
-            message: `Execution for audit '${auditName}' has been confirmed finished by the manager and is ready for your finalization.`,
-            type: 'action_required',
-            link: auditLink
-          });
-        }
-      }
-
-      // Execution Finished -> Finalized: Generate PDF and Alert Manager to preview/save report
-      if (existingAudit.status === 'Execution Finished' && data.status === 'Finalized') {
+      // Under Review -> Finalized: Generate PDF and Alert Chief Auditor for approval
+      if (existingAudit.status === 'Under Review' && data.status === 'Finalized') {
         // Generate PDF report when audit is finalized
         await this.reportsService.generatePDFToFile(updatedAudit.id);
 
-        if (updatedAudit.assignedManagerId) {
-          await this.notificationService.create({
-            userId: updatedAudit.assignedManagerId,
-            title: 'Audit Report Ready for Review',
-            message: `The audit '${auditName}' has been finalized. Please preview and save the report for CAE approval.`,
-            type: 'action_required',
-            link: `/reports/audit/${updatedAudit.id}/preview`
-          });
-        }
-      }
-
-      // Finalized -> Process Owner Review: Alert CAE
-      if (existingAudit.status === 'Finalized' && data.status === 'Process Owner Review') {
-        const caes = await this.prisma.user.findMany({
+        // Notify Chief Auditor that audit is finalized and ready for approval
+        const chiefAuditors = await this.prisma.user.findMany({
           where: {
             userRoles: {
               some: {
@@ -362,13 +325,24 @@ export class AuditService {
           }
         });
 
-        for (const cae of caes) {
+        for (const chiefAuditor of chiefAuditors) {
           await this.notificationService.create({
-            userId: cae.id,
-            title: 'Process Owner Reviewed Audit',
-            message: `The process owner has reviewed audit '${auditName}'. You can now close the audit.`,
-            type: 'info',
+            userId: chiefAuditor.id,
+            title: 'Audit Finalized - Awaiting Your Approval',
+            message: `Audit '${auditName}' has been finalized and is awaiting your approval to close.`,
+            type: 'action_required',
             link: auditLink
+          });
+        }
+
+        // Notify Manager that audit is finalized
+        if (updatedAudit.assignedManagerId) {
+          await this.notificationService.create({
+            userId: updatedAudit.assignedManagerId,
+            title: 'Audit Finalized',
+            message: `The audit '${auditName}' has been finalized. Please preview and save the report for Chief Auditor approval.`,
+            type: 'action_required',
+            link: `/reports/audit/${updatedAudit.id}/preview`
           });
         }
       }
@@ -401,11 +375,25 @@ export class AuditService {
   }
 
   async delete(id: number): Promise<Audit> {
-    await this.findOne(id);
+    const audit = await this.findOne(id);
+
+    // Prevent deletion of audits that have been approved or are beyond
+    if (audit.status !== 'Planned' && audit.status !== 'Rejected') {
+      throw new BadRequestException(
+        `Cannot delete audit with status '${audit.status}'. Only audits in 'Planned' or 'Rejected' status can be deleted.`,
+      );
+    }
 
     return this.prisma.audit.delete({
       where: { id },
       include: { findings: true, auditPrograms: true },
+    });
+  }
+
+  async updateChiefAuditorComments(auditId: number, comments: string): Promise<void> {
+    await this.prisma.audit.update({
+      where: { id: auditId },
+      data: { chiefAuditorComments: comments }
     });
   }
 }

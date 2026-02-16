@@ -11,6 +11,7 @@ import {
   ForbiddenException,
   UseGuards,
   Req,
+  HttpCode,
 } from '@nestjs/common';
 import { AuditService, CreateAuditDto, UpdateAuditDto } from './audit.service';
 import { AuditWorkflowService } from '../workflow/audit.workflow';
@@ -142,5 +143,15 @@ export class AuditController {
         audit.status,
       ),
     }));
+  }
+  
+  @Post(':id/chief-auditor-comments')
+  @HttpCode(200)
+  async saveChiefAuditorComments(
+    @Param('id') id: number,
+    @Body() commentsDto: { comments: string }
+  ) {
+    await this.auditService.updateChiefAuditorComments(id, commentsDto.comments);
+    return { message: 'Chief Auditor comments saved successfully' };
   }
 }

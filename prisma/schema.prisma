@@ -95,6 +95,7 @@ model Audit {
   auditUniverseId   Int?
   endDate           DateTime?
   startDate         DateTime?
+  chiefAuditorComments String?
   assignedManager   User?          @relation("auditManager", fields: [assignedManagerId], references: [id])
   auditUniverse     AuditUniverse? @relation(fields: [auditUniverseId], references: [id])
   auditPrograms     AuditProgram[]
@@ -180,7 +181,7 @@ model EvidenceVersion {
 
 model Finding {
   id             Int           @id @default(autoincrement())
-  auditId        Int
+  auditId        Int?
   description    String
   severity       String
   status         String        @default("Identified")
@@ -191,9 +192,8 @@ model Finding {
   assignedToId   Int?
   actionPlans    ActionPlan[]
   assignedTo     User?         @relation("FindingAssignee", fields: [assignedToId], references: [id])
-  audit          Audit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
   auditProgram   AuditProgram? @relation(fields: [auditProgramId], references: [id])
-
+  audit          Audit?         @relation(fields: [auditId], references: [id], onDelete: Cascade)
   @@index([assignedToId], map: "Finding_assignedToId_fkey")
   @@index([auditId], map: "Finding_auditId_fkey")
   @@index([auditProgramId], map: "Finding_auditProgramId_fkey")

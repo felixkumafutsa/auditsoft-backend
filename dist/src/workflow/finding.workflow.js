@@ -6,7 +6,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FindingWorkflowService = exports.CAE_FINDING_COMMENT_REQUIRED = exports.FindingSeverity = exports.FindingStatus = void 0;
+exports.FindingWorkflowService = exports.CHIEF_AUDITOR_FINDING_COMMENT_REQUIRED = exports.FindingSeverity = exports.FindingStatus = void 0;
 const common_1 = require("@nestjs/common");
 var FindingStatus;
 (function (FindingStatus) {
@@ -24,7 +24,7 @@ var FindingSeverity;
     FindingSeverity["MEDIUM"] = "Medium";
     FindingSeverity["LOW"] = "Low";
 })(FindingSeverity || (exports.FindingSeverity = FindingSeverity = {}));
-exports.CAE_FINDING_COMMENT_REQUIRED = [
+exports.CHIEF_AUDITOR_FINDING_COMMENT_REQUIRED = [
     { from: 'Remediation In Progress', to: 'Verified' },
     { from: 'Verified', to: 'Closed' },
 ];
@@ -37,8 +37,8 @@ let FindingWorkflowService = class FindingWorkflowService {
         [FindingStatus.VERIFIED]: [FindingStatus.CLOSED],
         [FindingStatus.CLOSED]: [],
     };
-    requiresCAEComment(fromStatus, toStatus) {
-        return exports.CAE_FINDING_COMMENT_REQUIRED.some(t => t.from === fromStatus && t.to === toStatus);
+    requiresChiefAuditorComment(fromStatus, toStatus) {
+        return exports.CHIEF_AUDITOR_FINDING_COMMENT_REQUIRED.some(t => t.from === fromStatus && t.to === toStatus);
     }
     canTransition(fromStatus, toStatus) {
         const from = fromStatus;
