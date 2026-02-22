@@ -1,7 +1,7 @@
 // src/workflow/finding.workflow.ts
 // Finding Lifecycle: Identified → Validated → Action Assigned → Remediation In Progress → Verified → Closed
-// Auditor identifies, Manager validates, Manager assigns action,
-// (Remediation happens), Chief Auditor verifies (with comment), Chief Auditor closes (with comment)
+// Auditor identifies, Manager validates, Chief Auditor assigns action, Chief Auditor manages remediation progress,
+// Chief Auditor verifies (with comment), Chief Auditor closes (with comment)
 
 import { Injectable, BadRequestException } from '@nestjs/common';
 
@@ -78,8 +78,9 @@ export class FindingWorkflowService {
   /**
    * Get role-based permissions for status transitions
    * Auditor: identifies
-   * Manager: validates, assigns action
-   * Chief Auditor: verifies (with comment), closes (with comment)
+   * Manager: validates
+   * Chief Auditor: assigns action, manages remediation, verifies (with comment), closes (with comment)
+   * Process Owner: views dashboard and reports (no status management)
    */
   getPermittedRoles(fromStatus: string, toStatus: string): string[] {
     const transitions: Record<string, Record<string, string[]>> = {
@@ -87,10 +88,10 @@ export class FindingWorkflowService {
         [FindingStatus.VALIDATED]: ['Audit Manager', 'Manager'],
       },
       [FindingStatus.VALIDATED]: {
-        [FindingStatus.ACTION_ASSIGNED]: ['Audit Manager', 'Manager'],
+        [FindingStatus.ACTION_ASSIGNED]: ['Chief Auditor'],
       },
       [FindingStatus.ACTION_ASSIGNED]: {
-        [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Audit Manager', 'Manager', 'Process Owner'],
+        [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Chief Auditor'],
       },
       [FindingStatus.REMEDIATION_IN_PROGRESS]: {
         [FindingStatus.VERIFIED]: ['Chief Auditor'],

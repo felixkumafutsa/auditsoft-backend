@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const notification_service_1 = require("../notification/notification.service");
 const reports_service_1 = require("../reports/reports.service");
+const class_validator_1 = require("class-validator");
 class CreateAuditDto {
     auditName;
     auditType;
@@ -26,6 +27,49 @@ class CreateAuditDto {
     templateId;
 }
 exports.CreateAuditDto = CreateAuditDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateAuditDto.prototype, "auditName", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateAuditDto.prototype, "auditType", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateAuditDto.prototype, "status", void 0);
+__decorate([
+    (0, class_validator_1.IsDate)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Date)
+], CreateAuditDto.prototype, "startDate", void 0);
+__decorate([
+    (0, class_validator_1.IsDate)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Date)
+], CreateAuditDto.prototype, "endDate", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], CreateAuditDto.prototype, "assignedManagerId", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], CreateAuditDto.prototype, "auditUniverseId", void 0);
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], CreateAuditDto.prototype, "assignedAuditorIds", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], CreateAuditDto.prototype, "templateId", void 0);
 class UpdateAuditDto {
     auditName;
     auditType;
@@ -35,8 +79,54 @@ class UpdateAuditDto {
     assignedManagerId;
     auditUniverseId;
     assignedAuditorIds;
+    chiefAuditorComments;
 }
 exports.UpdateAuditDto = UpdateAuditDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateAuditDto.prototype, "auditName", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateAuditDto.prototype, "auditType", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateAuditDto.prototype, "status", void 0);
+__decorate([
+    (0, class_validator_1.IsDate)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Date)
+], UpdateAuditDto.prototype, "startDate", void 0);
+__decorate([
+    (0, class_validator_1.IsDate)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Date)
+], UpdateAuditDto.prototype, "endDate", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], UpdateAuditDto.prototype, "assignedManagerId", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], UpdateAuditDto.prototype, "auditUniverseId", void 0);
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], UpdateAuditDto.prototype, "assignedAuditorIds", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateAuditDto.prototype, "chiefAuditorComments", void 0);
 let AuditService = class AuditService {
     prisma;
     notificationService;
@@ -180,7 +270,7 @@ let AuditService = class AuditService {
         if (!existingAudit) {
             throw new common_1.NotFoundException(`Audit with ID ${id} not found`);
         }
-        const { auditName, auditType, status, startDate, endDate, assignedManagerId, auditUniverseId, assignedAuditorIds } = data;
+        const { auditName, auditType, status, startDate, endDate, assignedManagerId, auditUniverseId, assignedAuditorIds, chiefAuditorComments } = data;
         const updateData = {
             ...(auditName !== undefined && { auditName }),
             ...(auditType !== undefined && { auditType }),
@@ -189,6 +279,7 @@ let AuditService = class AuditService {
             ...(endDate !== undefined && { endDate }),
             ...(assignedManagerId !== undefined && { assignedManagerId }),
             ...(auditUniverseId !== undefined && { auditUniverseId }),
+            ...(chiefAuditorComments !== undefined && { chiefAuditorComments }),
         };
         if (assignedAuditorIds) {
             updateData.assignedAuditors = {

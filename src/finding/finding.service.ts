@@ -8,20 +8,46 @@ import { Finding } from '@prisma/client';
 import { FindingWorkflowService } from '../workflow/finding.workflow';
 import { AuditService } from '../audit/audit.service';
 import { NotificationService } from '../notification/notification.service';
+import { IsString, IsOptional, IsNumber } from 'class-validator';
 
 export class CreateFindingDto {
+  @IsNumber()
   auditId: number;
+
+  @IsNumber()
+  @IsOptional()
   auditProgramId?: number;
+
+  @IsString()
   description: string;
+
+  @IsString()
   severity: string; // Critical / High / Medium / Low
+
+  @IsString()
+  @IsOptional()
   rootCause?: string;
+
+  @IsString()
+  @IsOptional()
   status?: string;
 }
 
 export class UpdateFindingDto {
+  @IsString()
+  @IsOptional()
   description?: string;
+
+  @IsString()
+  @IsOptional()
   severity?: string;
+
+  @IsString()
+  @IsOptional()
   rootCause?: string;
+
+  @IsString()
+  @IsOptional()
   status?: string;
 }
 
@@ -85,15 +111,23 @@ export class FindingService {
       throw new BadRequestException(`Findings can only be created for audits that are 'In Progress'. Current status: ${audit.status}`);
     }
 
+    const createData: any = {
+      auditId: data.auditId,
+      description: data.description,
+      severity: data.severity,
+      status: data.status || 'Identified',
+    };
+
+    // Only include optional fields if they are provided
+    if (data.auditProgramId !== undefined) {
+      createData.auditProgramId = data.auditProgramId;
+    }
+    if (data.rootCause !== undefined) {
+      createData.rootCause = data.rootCause;
+    }
+
     return this.prisma.finding.create({
-      data: {
-        auditId: data.auditId,
-        auditProgramId: data.auditProgramId,
-        description: data.description,
-        severity: data.severity,
-        rootCause: data.rootCause,
-        status: data.status || 'Identified',
-      },
+      data: createData,
       include: {
         audit: true,
         auditProgram: true,
@@ -318,5 +352,108 @@ export class FindingService {
         actionPlans: true,
       },
     });
+  }
+
+  /**
+   * Update finding status with role validation
+   */
+  async updateStatus(id: number, newStatus: string, userRole?: string, chiefAuditorComment?: string): Promise<Finding> {
+    const finding = await this.findOne(id);
+    
+    // Validate transition using workflow service
+    if (!this.workflowService.canTransition(finding.status, newStatus)) {
+      throw new BadRequestException(
+        `Cannot transition from ${finding.status} to ${newStatus}`,
+      );
+    }
+
+    // Check role permissions
+    if (userRole) {
+      const permittedRoles = this.workflowService.getPermittedRoles(finding.status, newStatus);
+      if (!permittedRoles.includes(userRole)) {
+        throw new BadRequestException(
+          `Role ${userRole} is not permitted to transition from ${finding.status} to ${newStatus}`,
+        );
+      }
+    }
+
+    // Validate Chief Auditor comment is provided when required
+    if (this.workflowService.requiresChiefAuditorComment(finding.status, newStatus) && !chiefAuditorComment) {
+      throw new BadRequestException(
+        `Chief Auditor comment is required for transitioning from ${finding.status} to ${newStatus}`,
+      );
+    }
+
+    // Update the finding status
+    const updatedFinding = await this.update(id, { status: newStatus });
+
+    // Send notifications
+    await this.sendStatusChangeNotifications(updatedFinding, finding.status, newStatus, chiefAuditorComment);
+
+    return updatedFinding;
+  }
+
+  /**
+   * Send notifications when finding status changes
+   */
+  private async sendStatusChangeNotifications(finding: Finding, oldStatus: string, newStatus: string, chiefAuditorComment?: string) {
+    try {
+      if (!finding.auditId) return;
+
+      const link = `/audits/${finding.auditId}`;
+      const findingDesc = finding.description.substring(0, 50);
+
+      // Validated -> Action Assigned: Notify Process Owners
+      if (oldStatus === 'Validated' && newStatus === 'Action Assigned') {
+        // Notify Process Owners
+        const processOwners = await this.prisma.user.findMany({
+          where: {
+            userRoles: {
+              some: {
+                role: {
+                  roleName: { in: ['Process Owner'] }
+                }
+              }
+            }
+          }
+        });
+        for (const processOwner of processOwners) {
+          await this.notificationService.create({
+            userId: processOwner.id,
+            title: 'Action Plan Assigned',
+            message: `Action plan has been assigned for finding "${findingDesc}..." in audit #${finding.auditId}`,
+            type: 'info',
+            link
+          });
+        }
+      }
+
+      // Action Assigned -> Remediation In Progress: Notify Chief Auditor
+      if (oldStatus === 'Action Assigned' && newStatus === 'Remediation In Progress') {
+        // Notify Chief Auditors
+        const chiefAuditors = await this.prisma.user.findMany({
+          where: {
+            userRoles: {
+              some: {
+                role: {
+                  roleName: { in: ['Chief Auditor'] }
+                }
+              }
+            }
+          }
+        });
+        for (const chiefAuditor of chiefAuditors) {
+          await this.notificationService.create({
+            userId: chiefAuditor.id,
+            title: 'Remediation Started',
+            message: `Remediation has started for finding "${findingDesc}..." in audit #${finding.auditId}`,
+            type: 'info',
+            link
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to send finding notification', e);
+    }
   }
 }

@@ -7,28 +7,80 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { Audit } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
 import { ReportsService } from '../reports/reports.service';
+import { IsString, IsOptional, IsDate, IsNumber, IsArray } from 'class-validator';
 
 export class CreateAuditDto {
+  @IsString()
   auditName: string;
+
+  @IsString()
   auditType: string;
+
+  @IsString()
+  @IsOptional()
   status?: string;
+
+  @IsDate()
+  @IsOptional()
   startDate?: Date;
+
+  @IsDate()
+  @IsOptional()
   endDate?: Date;
+
+  @IsNumber()
+  @IsOptional()
   assignedManagerId?: number;
+
+  @IsNumber()
+  @IsOptional()
   auditUniverseId?: number;
+
+  @IsArray()
+  @IsOptional()
   assignedAuditorIds?: number[];
+
+  @IsNumber()
+  @IsOptional()
   templateId?: number;
 }
 
 export class UpdateAuditDto {
+  @IsString()
+  @IsOptional()
   auditName?: string;
+
+  @IsString()
+  @IsOptional()
   auditType?: string;
+
+  @IsString()
+  @IsOptional()
   status?: string;
+
+  @IsDate()
+  @IsOptional()
   startDate?: Date;
+
+  @IsDate()
+  @IsOptional()
   endDate?: Date;
+
+  @IsNumber()
+  @IsOptional()
   assignedManagerId?: number;
+
+  @IsNumber()
+  @IsOptional()
   auditUniverseId?: number;
+
+  @IsArray()
+  @IsOptional()
   assignedAuditorIds?: number[];
+
+  @IsString()
+  @IsOptional()
+  chiefAuditorComments?: string;
 }
 
 @Injectable()
@@ -208,7 +260,8 @@ export class AuditService {
       endDate,
       assignedManagerId,
       auditUniverseId,
-      assignedAuditorIds
+      assignedAuditorIds,
+      chiefAuditorComments
     } = data;
 
     const updateData: any = {
@@ -219,6 +272,7 @@ export class AuditService {
       ...(endDate !== undefined && { endDate }),
       ...(assignedManagerId !== undefined && { assignedManagerId }),
       ...(auditUniverseId !== undefined && { auditUniverseId }),
+      ...(chiefAuditorComments !== undefined && { chiefAuditorComments }),
     };
 
     if (assignedAuditorIds) {

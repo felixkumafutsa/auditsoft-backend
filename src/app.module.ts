@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuditModule } from './audit/audit.module';
@@ -21,11 +22,14 @@ import { AuditUniverseModule } from './audit-universe/audit-universe.module';
 import { IntegrationModule } from './integration/integration.module';
 import { ContinuousAuditModule } from './continuous-audit/continuous-audit.module';
 import { WorkflowModule } from './workflow/workflow.module';
+import { WorkpaperModule } from './workpaper/workpaper.module';
+import { UploadModule } from './upload/upload.module';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
+    SwaggerModule,
     AuditModule,
     AuditProgramModule,
     EvidenceModule,
@@ -38,6 +42,8 @@ import { PrismaService } from '../prisma/prisma.service';
     IntegrationModule,
     ContinuousAuditModule,
     WorkflowModule,
+    WorkpaperModule,
+    UploadModule,
     UserModule,
     RoleModule,
     AuthModule,
@@ -49,4 +55,4 @@ import { PrismaService } from '../prisma/prisma.service';
   controllers: [AppController],
   providers: [AppService, PrismaService],
 })
-export class AppModule {}
+export class AppModule { }

@@ -18,9 +18,11 @@ import {
 } from './finding.service';
 import { FindingWorkflowService } from '../workflow/finding.workflow';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 
 @Controller('findings')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class FindingController {
   constructor(
     private findingService: FindingService,
@@ -79,6 +81,35 @@ export class FindingController {
   }
 
   // ========== WORKFLOW STATE TRANSITIONS ==========
+
+  @Post(':id/assign-action')
+  @Roles('Chief Auditor')
+  async assignAction(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { comment?: string },
+    @Req() req: any,
+  ) {
+    const finding = await this.findingService.findOne(id);
+    
+    // Transition to Action Assigned status
+    const updatedFinding = await this.findingService.transitionStatus(
+      id,
+      'Action Assigned',
+      'Chief Auditor',
+      body.comment,
+    );
+
+    // Return response with redirect information for action plan creation
+    return {
+      success: true,
+      message: 'Finding status changed to Action Assigned',
+      finding: updatedFinding,
+      redirectTo: {
+        path: `/action-plans/create?findingId=${id}`,
+        message: 'Please create an action plan for this finding'
+      }
+    };
+  }
 
   @Post(':id/transition')
   async transitionStatus(

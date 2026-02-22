@@ -32,6 +32,7 @@ model User {
   risksOwned         Risk[]            @relation("RiskOwner")
   userRoles          UserRole[]
   assignedAudits     Audit[]           @relation("auditAuditors")
+  timesheets         Timesheet[]
 }
 
 model Message {
@@ -103,6 +104,7 @@ model Audit {
   reports           Report[]
   risks             Risk[]         @relation("AuditRisks")
   assignedAuditors  User[]         @relation("auditAuditors")
+  timesheets        Timesheet[]
 
   @@index([assignedManagerId], map: "Audit_assignedManagerId_fkey")
   @@index([auditUniverseId], map: "Audit_auditUniverseId_fkey")
@@ -122,6 +124,7 @@ model AuditProgram {
   controlMappings  ControlMapping[]
   evidence         Evidence[]
   findings         Finding[]
+  workpaper        Workpaper?
 
   @@index([auditId], map: "AuditProgram_auditId_fkey")
 }
@@ -322,8 +325,19 @@ model Risk {
   title       String
   description String?
   category    String
-  impact      String
-  likelihood  String
+  
+  // Inherent Risk
+  impact             String  @default("Medium") // Kept for backward compatibility or UI choice
+  likelihood         String  @default("Medium") // Kept for backward compatibility or UI choice
+  inherentImpact     String?
+  inherentLikelihood String?
+  inherentScore      Int?
+  
+  // Residual Risk
+  residualImpact     String?
+  residualLikelihood String?
+  residualScore      Int?
+  
   status      String   @default("open")
   ownerId     Int?
   createdAt   DateTime @default(now())
@@ -333,6 +347,35 @@ model Risk {
   audits      Audit[]  @relation("AuditRisks")
 
   @@index([ownerId], map: "Risk_ownerId_fkey")
+}
+
+model Workpaper {
+  id               Int            @id @default(autoincrement())
+  auditProgramId   Int            @unique
+  title            String
+  description      String?
+  conclusion       String?        // Pass/Fail/Partial
+  testResults      String?        @db.LongText
+  preparedById     Int?
+  reviewedById     Int?
+  status           String         @default("Draft") // Draft, Pending Review, Reviewed
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  
+  auditProgram     AuditProgram   @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
+}
+
+model Timesheet {
+  id        Int      @id @default(autoincrement())
+  auditId   Int
+  userId    Int
+  hours     Float
+  workDate  DateTime
+  activity  String?
+  createdAt DateTime @default(now())
+  
+  audit     Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model KRI {

@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
+const swagger_1 = require("@nestjs/swagger");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
 const audit_module_1 = require("./audit/audit.module");
@@ -30,6 +31,8 @@ const audit_universe_module_1 = require("./audit-universe/audit-universe.module"
 const integration_module_1 = require("./integration/integration.module");
 const continuous_audit_module_1 = require("./continuous-audit/continuous-audit.module");
 const workflow_module_1 = require("./workflow/workflow.module");
+const workpaper_module_1 = require("./workpaper/workpaper.module");
+const upload_module_1 = require("./upload/upload.module");
 const prisma_service_1 = require("../prisma/prisma.service");
 let AppModule = class AppModule {
 };
@@ -38,6 +41,7 @@ exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
             config_1.ConfigModule.forRoot(),
+            swagger_1.SwaggerModule,
             audit_module_1.AuditModule,
             audit_program_module_1.AuditProgramModule,
             evidence_module_1.EvidenceModule,
@@ -50,6 +54,8 @@ exports.AppModule = AppModule = __decorate([
             integration_module_1.IntegrationModule,
             continuous_audit_module_1.ContinuousAuditModule,
             workflow_module_1.WorkflowModule,
+            workpaper_module_1.WorkpaperModule,
+            upload_module_1.UploadModule,
             user_module_1.UserModule,
             role_module_1.RoleModule,
             auth_module_1.AuthModule,

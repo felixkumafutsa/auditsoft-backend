@@ -5,10 +5,10 @@ export declare class AuditController {
     private workflowService;
     constructor(auditService: AuditService, workflowService: AuditWorkflowService);
     getAll(req: any): Promise<{
-        id: number;
-        status: string;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        status: string;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
@@ -18,10 +18,10 @@ export declare class AuditController {
         chiefAuditorComments: string | null;
     }[]>;
     getForOwner(req: any): Promise<{
-        id: number;
-        status: string;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        status: string;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
@@ -31,10 +31,10 @@ export declare class AuditController {
         chiefAuditorComments: string | null;
     }[]>;
     getTemplates(): Promise<{
-        id: number;
-        status: string;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        status: string;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
@@ -44,10 +44,10 @@ export declare class AuditController {
         chiefAuditorComments: string | null;
     }[]>;
     getOne(id: number, req: any): Promise<{
-        id: number;
-        status: string;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        status: string;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
@@ -57,10 +57,10 @@ export declare class AuditController {
         chiefAuditorComments: string | null;
     }>;
     create(body: CreateAuditDto): Promise<{
-        id: number;
-        status: string;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        status: string;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
@@ -70,10 +70,10 @@ export declare class AuditController {
         chiefAuditorComments: string | null;
     }>;
     update(id: number, body: UpdateAuditDto, req: any): Promise<{
-        id: number;
-        status: string;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        status: string;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
@@ -85,10 +85,10 @@ export declare class AuditController {
     assignAuditors(id: number, body: {
         auditorIds: number[];
     }): Promise<{
-        id: number;
-        status: string;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        status: string;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
@@ -98,10 +98,10 @@ export declare class AuditController {
         chiefAuditorComments: string | null;
     }>;
     delete(id: number): Promise<{
-        id: number;
-        status: string;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        status: string;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
@@ -116,10 +116,10 @@ export declare class AuditController {
         toStatus: string;
         userRole?: string;
     }, req: any): Promise<{
-        id: number;
-        status: string;
         createdAt: Date;
         updatedAt: Date;
+        id: number;
+        status: string;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;

@@ -15,6 +15,7 @@ const prisma_service_1 = require("../../prisma/prisma.service");
 const finding_workflow_1 = require("../workflow/finding.workflow");
 const audit_service_1 = require("../audit/audit.service");
 const notification_service_1 = require("../notification/notification.service");
+const class_validator_1 = require("class-validator");
 class CreateFindingDto {
     auditId;
     auditProgramId;
@@ -24,6 +25,33 @@ class CreateFindingDto {
     status;
 }
 exports.CreateFindingDto = CreateFindingDto;
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], CreateFindingDto.prototype, "auditId", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], CreateFindingDto.prototype, "auditProgramId", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateFindingDto.prototype, "description", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateFindingDto.prototype, "severity", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateFindingDto.prototype, "rootCause", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateFindingDto.prototype, "status", void 0);
 class UpdateFindingDto {
     description;
     severity;
@@ -31,6 +59,26 @@ class UpdateFindingDto {
     status;
 }
 exports.UpdateFindingDto = UpdateFindingDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateFindingDto.prototype, "description", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateFindingDto.prototype, "severity", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateFindingDto.prototype, "rootCause", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateFindingDto.prototype, "status", void 0);
 let FindingService = class FindingService {
     prisma;
     workflowService;
@@ -85,15 +133,20 @@ let FindingService = class FindingService {
         if (audit.status !== 'In Progress') {
             throw new common_1.BadRequestException(`Findings can only be created for audits that are 'In Progress'. Current status: ${audit.status}`);
         }
+        const createData = {
+            auditId: data.auditId,
+            description: data.description,
+            severity: data.severity,
+            status: data.status || 'Identified',
+        };
+        if (data.auditProgramId !== undefined) {
+            createData.auditProgramId = data.auditProgramId;
+        }
+        if (data.rootCause !== undefined) {
+            createData.rootCause = data.rootCause;
+        }
         return this.prisma.finding.create({
-            data: {
-                auditId: data.auditId,
-                auditProgramId: data.auditProgramId,
-                description: data.description,
-                severity: data.severity,
-                rootCause: data.rootCause,
-                status: data.status || 'Identified',
-            },
+            data: createData,
             include: {
                 audit: true,
                 auditProgram: true,
@@ -274,6 +327,79 @@ let FindingService = class FindingService {
                 actionPlans: true,
             },
         });
+    }
+    async updateStatus(id, newStatus, userRole, chiefAuditorComment) {
+        const finding = await this.findOne(id);
+        if (!this.workflowService.canTransition(finding.status, newStatus)) {
+            throw new common_1.BadRequestException(`Cannot transition from ${finding.status} to ${newStatus}`);
+        }
+        if (userRole) {
+            const permittedRoles = this.workflowService.getPermittedRoles(finding.status, newStatus);
+            if (!permittedRoles.includes(userRole)) {
+                throw new common_1.BadRequestException(`Role ${userRole} is not permitted to transition from ${finding.status} to ${newStatus}`);
+            }
+        }
+        if (this.workflowService.requiresChiefAuditorComment(finding.status, newStatus) && !chiefAuditorComment) {
+            throw new common_1.BadRequestException(`Chief Auditor comment is required for transitioning from ${finding.status} to ${newStatus}`);
+        }
+        const updatedFinding = await this.update(id, { status: newStatus });
+        await this.sendStatusChangeNotifications(updatedFinding, finding.status, newStatus, chiefAuditorComment);
+        return updatedFinding;
+    }
+    async sendStatusChangeNotifications(finding, oldStatus, newStatus, chiefAuditorComment) {
+        try {
+            if (!finding.auditId)
+                return;
+            const link = `/audits/${finding.auditId}`;
+            const findingDesc = finding.description.substring(0, 50);
+            if (oldStatus === 'Validated' && newStatus === 'Action Assigned') {
+                const processOwners = await this.prisma.user.findMany({
+                    where: {
+                        userRoles: {
+                            some: {
+                                role: {
+                                    roleName: { in: ['Process Owner'] }
+                                }
+                            }
+                        }
+                    }
+                });
+                for (const processOwner of processOwners) {
+                    await this.notificationService.create({
+                        userId: processOwner.id,
+                        title: 'Action Plan Assigned',
+                        message: `Action plan has been assigned for finding "${findingDesc}..." in audit #${finding.auditId}`,
+                        type: 'info',
+                        link
+                    });
+                }
+            }
+            if (oldStatus === 'Action Assigned' && newStatus === 'Remediation In Progress') {
+                const chiefAuditors = await this.prisma.user.findMany({
+                    where: {
+                        userRoles: {
+                            some: {
+                                role: {
+                                    roleName: { in: ['Chief Auditor'] }
+                                }
+                            }
+                        }
+                    }
+                });
+                for (const chiefAuditor of chiefAuditors) {
+                    await this.notificationService.create({
+                        userId: chiefAuditor.id,
+                        title: 'Remediation Started',
+                        message: `Remediation has started for finding "${findingDesc}..." in audit #${finding.auditId}`,
+                        type: 'info',
+                        link
+                    });
+                }
+            }
+        }
+        catch (e) {
+            console.error('Failed to send finding notification', e);
+        }
     }
 };
 exports.FindingService = FindingService;

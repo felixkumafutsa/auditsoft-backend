@@ -17,6 +17,8 @@ const common_1 = require("@nestjs/common");
 const finding_service_1 = require("./finding.service");
 const finding_workflow_1 = require("../workflow/finding.workflow");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
+const roles_decorator_1 = require("../common/decorators/roles.decorator");
+const roles_guard_1 = require("../common/guards/roles.guard");
 let FindingController = class FindingController {
     findingService;
     workflowService;
@@ -51,6 +53,19 @@ let FindingController = class FindingController {
     }
     delete(id) {
         return this.findingService.delete(id);
+    }
+    async assignAction(id, body, req) {
+        const finding = await this.findingService.findOne(id);
+        const updatedFinding = await this.findingService.transitionStatus(id, 'Action Assigned', 'Chief Auditor', body.comment);
+        return {
+            success: true,
+            message: 'Finding status changed to Action Assigned',
+            finding: updatedFinding,
+            redirectTo: {
+                path: `/action-plans/create?findingId=${id}`,
+                message: 'Please create an action plan for this finding'
+            }
+        };
     }
     async transitionStatus(id, body) {
         return this.findingService.transitionStatus(id, body.toStatus, body.userRole, body.comment);
@@ -139,6 +154,16 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], FindingController.prototype, "delete", null);
 __decorate([
+    (0, common_1.Post)(':id/assign-action'),
+    (0, roles_decorator_1.Roles)('Chief Auditor'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object, Object]),
+    __metadata("design:returntype", Promise)
+], FindingController.prototype, "assignAction", null);
+__decorate([
     (0, common_1.Post)(':id/transition'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
@@ -163,7 +188,7 @@ __decorate([
 ], FindingController.prototype, "escalate", null);
 exports.FindingController = FindingController = __decorate([
     (0, common_1.Controller)('findings'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     __metadata("design:paramtypes", [finding_service_1.FindingService,
         finding_workflow_1.FindingWorkflowService])
 ], FindingController);

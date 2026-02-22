@@ -8,8 +8,21 @@ export class AuditUniverseService {
   constructor(private prisma: PrismaService) {}
 
   create(data: CreateAuditUniverseDto) {
+    const createData: any = {
+      entityType: data.entityType,
+      entityName: data.entityName,
+    };
+
+    // Only include optional fields if they are provided
+    if (data.riskRating !== undefined) {
+      createData.riskRating = data.riskRating;
+    }
+    if (data.ownerId !== undefined) {
+      createData.ownerId = data.ownerId;
+    }
+
     return this.prisma.auditUniverse.create({
-      data,
+      data: createData,
     });
   }
 

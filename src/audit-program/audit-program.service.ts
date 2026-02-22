@@ -8,14 +8,27 @@ export class AuditProgramService {
   constructor(private prisma: PrismaService) {}
 
   async create(data: CreateAuditProgramDto) {
+    const createData: any = {
+      auditId: data.auditId,
+      procedureName: data.procedureName,
+    };
+
+    // Only include optional fields if they are provided
+    if (data.controlReference !== undefined) {
+      createData.controlReference = data.controlReference;
+    }
+    if (data.expectedOutcome !== undefined) {
+      createData.expectedOutcome = data.expectedOutcome;
+    }
+    if (data.actualResult !== undefined) {
+      createData.actualResult = data.actualResult;
+    }
+    if (data.reviewerComment !== undefined) {
+      createData.reviewerComment = data.reviewerComment;
+    }
+
     return this.prisma.auditProgram.create({
-      data: {
-        auditId: data.auditId,
-        procedureName: data.procedureName,
-        controlReference: data.controlReference,
-        expectedOutcome: data.expectedOutcome,
-        actualResult: data.actualResult,
-      },
+      data: createData,
     });
   }
 
@@ -31,9 +44,29 @@ export class AuditProgramService {
 
   async update(id: number, data: UpdateAuditProgramDto) {
     await this.findOne(id);
+    
+    const updateData: any = {};
+    
+    // Only include fields that are provided
+    if (data.procedureName !== undefined) {
+      updateData.procedureName = data.procedureName;
+    }
+    if (data.controlReference !== undefined) {
+      updateData.controlReference = data.controlReference;
+    }
+    if (data.expectedOutcome !== undefined) {
+      updateData.expectedOutcome = data.expectedOutcome;
+    }
+    if (data.actualResult !== undefined) {
+      updateData.actualResult = data.actualResult;
+    }
+    if (data.reviewerComment !== undefined) {
+      updateData.reviewerComment = data.reviewerComment;
+    }
+
     return this.prisma.auditProgram.update({
       where: { id },
-      data,
+      data: updateData,
     });
   }
 

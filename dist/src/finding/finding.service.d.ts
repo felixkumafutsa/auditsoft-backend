@@ -32,4 +32,6 @@ export declare class FindingService {
     delete(id: number): Promise<Finding>;
     getCriticalFindings(): Promise<Finding[]>;
     getOverdueFindings(): Promise<Finding[]>;
+    updateStatus(id: number, newStatus: string, userRole?: string, chiefAuditorComment?: string): Promise<Finding>;
+    private sendStatusChangeNotifications;
 }

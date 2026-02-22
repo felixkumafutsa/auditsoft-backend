@@ -62,10 +62,10 @@ let FindingWorkflowService = class FindingWorkflowService {
                 [FindingStatus.VALIDATED]: ['Audit Manager', 'Manager'],
             },
             [FindingStatus.VALIDATED]: {
-                [FindingStatus.ACTION_ASSIGNED]: ['Audit Manager', 'Manager'],
+                [FindingStatus.ACTION_ASSIGNED]: ['Chief Auditor'],
             },
             [FindingStatus.ACTION_ASSIGNED]: {
-                [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Audit Manager', 'Manager', 'Process Owner'],
+                [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Chief Auditor'],
             },
             [FindingStatus.REMEDIATION_IN_PROGRESS]: {
                 [FindingStatus.VERIFIED]: ['Chief Auditor'],

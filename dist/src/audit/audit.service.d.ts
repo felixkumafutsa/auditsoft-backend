@@ -22,6 +22,7 @@ export declare class UpdateAuditDto {
     assignedManagerId?: number;
     auditUniverseId?: number;
     assignedAuditorIds?: number[];
+    chiefAuditorComments?: string;
 }
 export declare class AuditService {
     private prisma;

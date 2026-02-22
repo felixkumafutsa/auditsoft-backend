@@ -11,10 +11,12 @@ import { AuditCommentsService } from './audit-comments.service';
 import { BulkAuditService } from './bulk-audit.service';
 import { NotificationModule } from '../notification/notification.module';
 import { ReportsModule } from '../reports/reports.module';
+import { TimesheetService } from './timesheet.service';
+import { TimesheetController } from './timesheet.controller';
 
 @Module({
   imports: [NotificationModule, ReportsModule],
-  controllers: [AuditController, AuditWorkflowController],
+  controllers: [AuditController, AuditWorkflowController, TimesheetController],
   providers: [
     AuditService,
     PrismaService,
@@ -24,7 +26,8 @@ import { ReportsModule } from '../reports/reports.module';
     AuditApprovalService,
     AuditCommentsService,
     BulkAuditService,
+    TimesheetService,
   ],
-  exports: [AuditService],
+  exports: [AuditService, TimesheetService],
 })
-export class AuditModule {}
+export class AuditModule { }

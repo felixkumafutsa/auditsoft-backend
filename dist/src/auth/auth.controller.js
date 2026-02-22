@@ -14,12 +14,24 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthController = exports.LoginDto = void 0;
 const common_1 = require("@nestjs/common");
+const class_validator_1 = require("class-validator");
+const throttler_1 = require("@nestjs/throttler");
 const auth_service_1 = require("./auth.service");
+const public_decorator_1 = require("../common/decorators/public.decorator");
 class LoginDto {
     email;
     pass;
 }
 exports.LoginDto = LoginDto;
+__decorate([
+    (0, class_validator_1.IsEmail)({}, { message: 'Invalid email address' }),
+    __metadata("design:type", String)
+], LoginDto.prototype, "email", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MinLength)(6, { message: 'Password must be at least 6 characters' }),
+    __metadata("design:type", String)
+], LoginDto.prototype, "pass", void 0);
 let AuthController = class AuthController {
     authService;
     constructor(authService) {
@@ -31,8 +43,10 @@ let AuthController = class AuthController {
 };
 exports.AuthController = AuthController;
 __decorate([
+    (0, public_decorator_1.Public)(),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, common_1.Post)('login'),
+    (0, throttler_1.Throttle)({ default: { limit: 5, ttl: 60000 } }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [LoginDto]),

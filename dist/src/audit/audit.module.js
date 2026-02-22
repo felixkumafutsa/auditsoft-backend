@@ -20,13 +20,15 @@ const audit_comments_service_1 = require("./audit-comments.service");
 const bulk_audit_service_1 = require("./bulk-audit.service");
 const notification_module_1 = require("../notification/notification.module");
 const reports_module_1 = require("../reports/reports.module");
+const timesheet_service_1 = require("./timesheet.service");
+const timesheet_controller_1 = require("./timesheet.controller");
 let AuditModule = class AuditModule {
 };
 exports.AuditModule = AuditModule;
 exports.AuditModule = AuditModule = __decorate([
     (0, common_1.Module)({
         imports: [notification_module_1.NotificationModule, reports_module_1.ReportsModule],
-        controllers: [audit_controller_1.AuditController, audit_workflow_controller_1.AuditWorkflowController],
+        controllers: [audit_controller_1.AuditController, audit_workflow_controller_1.AuditWorkflowController, timesheet_controller_1.TimesheetController],
         providers: [
             audit_service_1.AuditService,
             prisma_service_1.PrismaService,
@@ -36,8 +38,9 @@ exports.AuditModule = AuditModule = __decorate([
             audit_approval_service_1.AuditApprovalService,
             audit_comments_service_1.AuditCommentsService,
             bulk_audit_service_1.BulkAuditService,
+            timesheet_service_1.TimesheetService,
         ],
-        exports: [audit_service_1.AuditService],
+        exports: [audit_service_1.AuditService, timesheet_service_1.TimesheetService],
     })
 ], AuditModule);
 //# sourceMappingURL=audit.module.js.map

@@ -334,13 +334,24 @@ export class ReportsService {
         auditUniverse: true,
         auditPrograms: {
           include: {
-            findings: true,
-            evidence: true
+            findings: {
+              include: {
+                actionPlans: {
+                  include: {
+                    owner: true
+                  }
+                }
+              }
+            }
           }
         },
         findings: {
           include: {
-            actionPlans: true
+            actionPlans: {
+              include: {
+                owner: true
+              }
+            }
           }
         },
         risks: true
@@ -394,10 +405,77 @@ export class ReportsService {
         doc.fontSize(12).text(`${index + 1}. ${finding.description} (${finding.severity})`);
         doc.fontSize(10).text(`   Status: ${finding.status}`);
         if (finding.rootCause) doc.text(`   Root Cause: ${finding.rootCause}`);
+        
+        // Action Plans and Remediation
+        if (finding.actionPlans && finding.actionPlans.length > 0) {
+          finding.actionPlans.forEach((plan, planIndex) => {
+            doc.fontSize(10).text(`   Action Plan ${planIndex + 1}:`);
+            doc.fontSize(10).text(`     Description: ${plan.description}`);
+            doc.fontSize(10).text(`     Assigned To: ${plan.owner?.name || 'Unassigned'}`);
+            doc.fontSize(10).text(`     Due Date: ${plan.dueDate ? new Date(plan.dueDate).toDateString() : 'Not Set'}`);
+            doc.fontSize(10).text(`     Status: ${plan.status}`);
+            doc.fontSize(10).text(`     Created: ${new Date(plan.createdAt).toDateString()}`);
+            if (planIndex < finding.actionPlans.length - 1) {
+              doc.text('');
+            }
+          });
+        } else {
+          doc.fontSize(10).text('   No action plans assigned.');
+        }
+        
         doc.moveDown(0.5);
       });
     } else {
       doc.fontSize(12).text('No findings identified.');
+    }
+    doc.moveDown();
+
+    // Action Plans Summary
+    doc.fontSize(14).text('Action Plans Summary', { underline: true });
+    const actionPlansSummary = audit.findings?.flatMap(f => f.actionPlans || []) || [];
+    if (actionPlansSummary.length > 0) {
+      const totalPlans = actionPlansSummary.length;
+      const openPlans = actionPlansSummary.filter(p => p.status === 'Open').length;
+      const inProgressPlans = actionPlansSummary.filter(p => p.status === 'In Progress').length;
+      const completedPlans = actionPlansSummary.filter(p => p.status === 'Completed').length;
+      const overduePlans = actionPlansSummary.filter(p => p.dueDate && new Date(p.dueDate) < new Date()).length;
+      
+      doc.fontSize(12).text(`Total Action Plans: ${totalPlans}`);
+      doc.fontSize(12).text(`Open: ${openPlans} | In Progress: ${inProgressPlans} | Completed: ${completedPlans}`);
+      doc.fontSize(12).text(`Overdue: ${overduePlans}`);
+      
+      // Action Plans by Status
+      doc.fontSize(12).text('Action Plans by Status:', { underline: true });
+      doc.fontSize(10).text(`  Open: ${openPlans} plans`);
+      doc.fontSize(10).text(`  In Progress: ${inProgressPlans} plans`);
+      doc.fontSize(10).text(`  Completed: ${completedPlans} plans`);
+      doc.fontSize(10).text(`  Overdue: ${overduePlans} plans`);
+      doc.moveDown();
+      
+      // Action Plans by Assignee
+      doc.fontSize(12).text('Action Plans by Assignee:', { underline: true });
+      const plansByAssignee = actionPlansSummary.reduce((acc: any, plan: any) => {
+        const assignee = plan.owner?.name || 'Unassigned';
+        if (!acc[assignee]) acc[assignee] = [];
+        acc[assignee].push(plan);
+        return acc;
+      }, {});
+      
+      Object.entries(plansByAssignee).forEach(([assignee, plans]: [string, any]) => {
+        doc.fontSize(10).text(`  ${assignee}: ${plans.length} plans`);
+      });
+      doc.moveDown();
+      
+      // Overdue Action Plans
+      if (overduePlans > 0) {
+        doc.fontSize(12).text('Overdue Action Plans:', { underline: true });
+        overduePlans.forEach((plan: any) => {
+          doc.fontSize(10).text(`  ${plan.description} - ${plan.owner?.name || 'Unassigned'} (Due: ${new Date(plan.dueDate).toDateString()})`);
+        });
+        doc.moveDown();
+      }
+    } else {
+      doc.fontSize(12).text('No action plans defined.');
     }
     doc.moveDown();
 
@@ -408,6 +486,66 @@ export class ReportsService {
       totalEvidence += program.evidence?.length || 0;
     });
     doc.fontSize(12).text(`Total Evidence Files Uploaded: ${totalEvidence}`);
+
+    // Remediation Status Summary
+    doc.fontSize(14).text('Remediation Status Summary', { underline: true });
+    if (actionPlansSummary.length > 0) {
+      const remediationStats = {
+        total: actionPlansSummary.length,
+        notStarted: actionPlansSummary.filter(p => p.status === 'Open').length,
+        inProgress: actionPlansSummary.filter(p => p.status === 'In Progress').length,
+        completed: actionPlansSummary.filter(p => p.status === 'Completed').length,
+        overdue: actionPlansSummary.filter(p => p.dueDate && new Date(p.dueDate) < new Date()).length,
+        onTime: actionPlansSummary.filter(p => p.dueDate && new Date(p.dueDate) >= new Date()).length
+      };
+      
+      doc.fontSize(12).text(`Total Remediation Items: ${remediationStats.total}`);
+      doc.fontSize(12).text(`Completion Rate: ${Math.round((remediationStats.completed / remediationStats.total) * 100)}%`);
+      doc.fontSize(12).text(`On-Time Completion: ${Math.round((remediationStats.onTime / remediationStats.total) * 100)}%`);
+      doc.fontSize(12).text(`Overdue Items: ${remediationStats.overdue} (${Math.round((remediationStats.overdue / remediationStats.total) * 100)}%)`);
+      
+      // Remediation Timeline
+      doc.fontSize(12).text('Remediation Timeline:', { underline: true });
+      const sortedPlans = actionPlansSummary.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      const recentPlans = sortedPlans.slice(0, 5);
+      recentPlans.forEach((plan: any, index: number) => {
+        doc.fontSize(10).text(`  ${index + 1}. ${plan.description} - Created: ${new Date(plan.createdAt).toDateString()}`);
+      });
+      doc.moveDown();
+      
+      // Risk-Based Findings
+      const highRiskFindings = audit.findings?.filter(f => f.severity === 'High' || f.severity === 'Critical').length || 0;
+      const mediumRiskFindings = audit.findings?.filter(f => f.severity === 'Medium').length || 0;
+      const lowRiskFindings = audit.findings?.filter(f => f.severity === 'Low').length || 0;
+      
+      doc.fontSize(12).text('Risk-Based Findings Summary:', { underline: true });
+      doc.fontSize(10).text(`  Critical/High Risk: ${highRiskFindings} findings`);
+      doc.fontSize(10).text(`  Medium Risk: ${mediumRiskFindings} findings`);
+      doc.fontSize(10).text(`  Low Risk: ${lowRiskFindings} findings`);
+      doc.moveDown();
+      
+      // Overdue Action Plans
+      if (remediationStats.overdue > 0) {
+        doc.fontSize(12).text('Overdue Action Plans:', { underline: true });
+        const overduePlansList = actionPlansSummary.filter((p: any) => p.dueDate && new Date(p.dueDate) < new Date());
+        overduePlansList.forEach((plan: any) => {
+          doc.fontSize(10).text(`  ${plan.description} - ${plan.owner?.name || 'Unassigned'} (Due: ${new Date(plan.dueDate).toDateString()})`);
+        });
+        doc.moveDown();
+      }
+    } else {
+      doc.fontSize(12).text('No remediation activities defined.');
+    }
+    doc.moveDown();
+
+    // Executive Summary
+    doc.fontSize(14).text('Executive Summary', { underline: true });
+    doc.fontSize(12).text(`Audit Completion Rate: ${audit.auditPrograms?.filter(p => p.actualResult === 'Completed').length || 0}/${audit.auditPrograms?.length || 0} programs completed`);
+    doc.fontSize(12).text(`Findings Identified: ${audit.findings?.length || 0} total findings`);
+    doc.fontSize(12).text(`Action Plans Required: ${actionPlansSummary.length} remediation items`);
+    doc.fontSize(12).text(`Evidence Collected: ${totalEvidence} evidence files`);
+    doc.fontSize(12).text(`Audit Period: ${audit.startDate ? new Date(audit.startDate).toDateString() : 'N/A'} to ${audit.endDate ? new Date(audit.endDate).toDateString() : 'N/A'}`);
+    doc.moveDown();
 
     doc.end();
   }
