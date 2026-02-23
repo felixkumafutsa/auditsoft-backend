@@ -189,12 +189,12 @@ let AuditService = class AuditService {
                 if (isAuditor) {
                     const isAssigned = audit.assignedAuditors.some((auditor) => auditor.id === user.id);
                     if (!isAssigned) {
-                        throw new ForbiddenException(`You do not have access to this audit`);
+                        throw new common_1.ForbiddenException(`You do not have access to this audit`);
                     }
                 }
                 else if (isProcessOwner) {
                     if (audit.auditUniverse?.ownerId !== user.id) {
-                        throw new ForbiddenException(`You do not have access to audits for this entity`);
+                        throw new common_1.ForbiddenException(`You do not have access to audits for this entity`);
                     }
                 }
             }

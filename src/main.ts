@@ -52,7 +52,7 @@ async function bootstrap() {
   const reflector = app.get(Reflector);
   app.useGlobalGuards(new JwtAuthGuard(reflector));
 
-  if (!dbUrl) {
+  if (!process.env.DATABASE_URL) {
     console.error('[Bootstrap] CRITICAL: DATABASE_URL is not defined!');
   }
 

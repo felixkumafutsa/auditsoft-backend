@@ -72,7 +72,7 @@ async function bootstrap() {
     }));
     const reflector = app.get(core_1.Reflector);
     app.useGlobalGuards(new jwt_auth_guard_1.JwtAuthGuard(reflector));
-    if (!dbUrl) {
+    if (!process.env.DATABASE_URL) {
         console.error('[Bootstrap] CRITICAL: DATABASE_URL is not defined!');
     }
     const config = new swagger_1.DocumentBuilder()

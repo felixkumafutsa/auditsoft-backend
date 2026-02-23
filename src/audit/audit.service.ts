@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Audit } from '@prisma/client';
@@ -137,6 +138,7 @@ export class AuditService {
         auditUniverse: true
       },
     });
+
 
     if (!audit) {
       throw new NotFoundException(`Audit with ID ${id} not found`);
