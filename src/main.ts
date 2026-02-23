@@ -52,12 +52,7 @@ async function bootstrap() {
   const reflector = app.get(Reflector);
   app.useGlobalGuards(new JwtAuthGuard(reflector));
 
-  // ─── Debug: Log Database URL (masked) ─────────────────────────────────────
-  const dbUrl = process.env.DATABASE_URL;
-  if (dbUrl) {
-    const maskedUrl = dbUrl.replace(/:([^:@]+)@/, ':****@');
-    console.log(`[Bootstrap] Using DATABASE_URL: ${maskedUrl}`);
-  } else {
+  if (!dbUrl) {
     console.error('[Bootstrap] CRITICAL: DATABASE_URL is not defined!');
   }
 
@@ -71,7 +66,7 @@ async function bootstrap() {
 
   // Create the document
   const document = SwaggerModule.createDocument(app, config);
-  
+
   // Setup with custom options
   SwaggerModule.setup('api', app, document);
 

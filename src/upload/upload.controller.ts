@@ -30,7 +30,7 @@ const storage = diskStorage({
 @Controller('upload')
 @UseGuards(JwtAuthGuard)
 export class UploadController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   @Post('policy-document')
   @UseInterceptors(FileInterceptor('file', { storage }))
@@ -76,7 +76,7 @@ export class UploadController {
       //     filePath: `/uploads/policy-documents/${file.filename}`,
       //   },
       // });
-      console.log(`File uploaded for framework ${frameworkId}: ${file.originalname}`);
+      // File uploaded successfully
     }
 
     return {

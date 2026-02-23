@@ -7,7 +7,7 @@ export class ContinuousAuditService {
   constructor(
     private prisma: PrismaService,
     private scheduler: SchedulerService
-  ) {}
+  ) { }
 
   async createControl(data: any) {
     return this.prisma.automatedControl.create({ data });
@@ -29,7 +29,7 @@ export class ContinuousAuditService {
   async runControl(controlId: number) {
     // Logic to manually trigger a run
     // For now, just logging it
-    console.log(`Manually running control #${controlId}`);
+    // Manually running control
     return { message: 'Control run initiated' };
   }
 

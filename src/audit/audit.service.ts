@@ -100,12 +100,16 @@ export class AuditService {
     if (user) {
       const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
       const isAuditor = roles.includes('Auditor');
-      const isProcessOwner = roles.includes('Process Owner');
+      // Normalize role check (handle potential variations in casing/spacing)
+      const isProcessOwner = roles.some(r => r.toLowerCase().includes('process owner'));
+      const isAdminOrManager = roles.some(r => ['System Administrator', 'Audit Manager', 'CAE', 'Chief Auditor'].includes(r));
 
-      if (isAuditor) {
-        where.assignedAuditors = { some: { id: user.id } };
-      } else if (isProcessOwner) {
-        where.auditUniverse = { ownerId: user.id };
+      if (!isAdminOrManager) {
+        if (isAuditor) {
+          where.assignedAuditors = { some: { id: user.id } };
+        } else if (isProcessOwner) {
+          where.auditUniverse = { ownerId: user.id };
+        }
       }
     }
 
@@ -125,7 +129,13 @@ export class AuditService {
   async findOne(id: number, user?: any): Promise<Audit> {
     const audit = await this.prisma.audit.findUnique({
       where: { id },
-      include: { findings: true, auditPrograms: true, assignedManager: true, assignedAuditors: true },
+      include: {
+        findings: true,
+        auditPrograms: true,
+        assignedManager: true,
+        assignedAuditors: true,
+        auditUniverse: true
+      },
     });
 
     if (!audit) {
@@ -133,14 +143,21 @@ export class AuditService {
     }
 
     if (user) {
-      // Check if user has Auditor role
       const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
       const isAuditor = roles.includes('Auditor');
+      const isProcessOwner = roles.some(r => r.toLowerCase().includes('process owner'));
+      const isAdminOrManager = roles.some(r => ['System Administrator', 'Audit Manager', 'CAE', 'Chief Auditor'].includes(r));
 
-      if (isAuditor) {
-        const isAssigned = audit.assignedAuditors.some((auditor) => auditor.id === user.id);
-        if (!isAssigned) {
-          throw new NotFoundException(`Audit with ID ${id} not found`); // Hiding existence for security
+      if (!isAdminOrManager) {
+        if (isAuditor) {
+          const isAssigned = audit.assignedAuditors.some((auditor) => auditor.id === user.id);
+          if (!isAssigned) {
+            throw new ForbiddenException(`You do not have access to this audit`);
+          }
+        } else if (isProcessOwner) {
+          if (audit.auditUniverse?.ownerId !== user.id) {
+            throw new ForbiddenException(`You do not have access to audits for this entity`);
+          }
         }
       }
     }
