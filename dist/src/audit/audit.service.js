@@ -225,7 +225,7 @@ let AuditService = class AuditService {
                     userRoles: {
                         some: {
                             role: {
-                                roleName: { in: ['Chief Auditor'] }
+                                roleName: { in: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
                             }
                         }
                     }
@@ -358,7 +358,7 @@ let AuditService = class AuditService {
                         userRoles: {
                             some: {
                                 role: {
-                                    roleName: { in: ['Chief Auditor'] }
+                                    roleName: { in: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
                                 }
                             }
                         }

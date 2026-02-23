@@ -27,7 +27,7 @@ export class FindingController {
   constructor(
     private findingService: FindingService,
     private workflowService: FindingWorkflowService,
-  ) {}
+  ) { }
 
   @Get()
   getAll() {
@@ -51,9 +51,9 @@ export class FindingController {
 
   @Get(':id/action-plans')
   async getActionPlans(@Param('id', ParseIntPipe) id: number) {
-     
+
     const finding: any = await this.findingService.findOne(id);
-     
+
     return finding.actionPlans || [];
   }
 
@@ -83,14 +83,14 @@ export class FindingController {
   // ========== WORKFLOW STATE TRANSITIONS ==========
 
   @Post(':id/assign-action')
-  @Roles('Chief Auditor')
+  @Roles('Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)')
   async assignAction(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { comment?: string },
     @Req() req: any,
   ) {
     const finding = await this.findingService.findOne(id);
-    
+
     // Transition to Action Assigned status
     const updatedFinding = await this.findingService.transitionStatus(
       id,

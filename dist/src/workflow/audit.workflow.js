@@ -170,8 +170,8 @@ let AuditWorkflowService = class AuditWorkflowService {
     getPermittedRoles(fromStatus, toStatus) {
         const transitions = {
             [AuditStatus.PLANNED]: {
-                [AuditStatus.APPROVED]: ['Chief Auditor'],
-                [AuditStatus.REJECTED]: ['Chief Auditor'],
+                [AuditStatus.APPROVED]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
+                [AuditStatus.REJECTED]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
             },
             [AuditStatus.REJECTED]: {
                 [AuditStatus.PLANNED]: ['Audit Manager', 'Manager'],
@@ -187,7 +187,7 @@ let AuditWorkflowService = class AuditWorkflowService {
                 [AuditStatus.IN_PROGRESS]: ['Audit Manager', 'Manager'],
             },
             [AuditStatus.FINALIZED]: {
-                [AuditStatus.CLOSED]: ['Chief Auditor'],
+                [AuditStatus.CLOSED]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
             },
         };
         return transitions[fromStatus]?.[toStatus] || [];

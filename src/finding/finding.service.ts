@@ -220,7 +220,7 @@ export class FindingService {
             userRoles: {
               some: {
                 role: {
-                  roleName: { in: ['Chief Auditor'] }
+                  roleName: { in: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
                 }
               }
             }
@@ -359,7 +359,7 @@ export class FindingService {
    */
   async updateStatus(id: number, newStatus: string, userRole?: string, chiefAuditorComment?: string): Promise<Finding> {
     const finding = await this.findOne(id);
-    
+
     // Validate transition using workflow service
     if (!this.workflowService.canTransition(finding.status, newStatus)) {
       throw new BadRequestException(
@@ -436,7 +436,7 @@ export class FindingService {
             userRoles: {
               some: {
                 role: {
-                  roleName: { in: ['Chief Auditor'] }
+                  roleName: { in: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
                 }
               }
             }

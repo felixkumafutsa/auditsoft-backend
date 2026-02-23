@@ -230,8 +230,8 @@ export class AuditWorkflowService {
   getPermittedRoles(fromStatus: string, toStatus: string): string[] {
     const transitions: Record<string, Record<string, string[]>> = {
       [AuditStatus.PLANNED]: {
-        [AuditStatus.APPROVED]: ['Chief Auditor'],
-        [AuditStatus.REJECTED]: ['Chief Auditor'],
+        [AuditStatus.APPROVED]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
+        [AuditStatus.REJECTED]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
       },
       [AuditStatus.REJECTED]: {
         [AuditStatus.PLANNED]: ['Audit Manager', 'Manager'],
@@ -247,7 +247,7 @@ export class AuditWorkflowService {
         [AuditStatus.IN_PROGRESS]: ['Audit Manager', 'Manager'], // Send back for rework
       },
       [AuditStatus.FINALIZED]: {
-        [AuditStatus.CLOSED]: ['Chief Auditor'], // Chief Auditor approves at finalization
+        [AuditStatus.CLOSED]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'], // Chief Auditor approves at finalization
       },
     };
 

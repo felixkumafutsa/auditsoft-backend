@@ -5,100 +5,100 @@ export declare class FindingController {
     private workflowService;
     constructor(findingService: FindingService, workflowService: FindingWorkflowService);
     getAll(): Promise<{
-        id: number;
         auditId: number | null;
+        auditProgramId: number | null;
         description: string;
         severity: string;
+        rootCause: string | null;
         status: string;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
-        auditProgramId: number | null;
-        rootCause: string | null;
         assignedToId: number | null;
     }[]>;
     getCritical(): Promise<{
-        id: number;
         auditId: number | null;
+        auditProgramId: number | null;
         description: string;
         severity: string;
+        rootCause: string | null;
         status: string;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
-        auditProgramId: number | null;
-        rootCause: string | null;
         assignedToId: number | null;
     }[]>;
     getOverdue(): Promise<{
-        id: number;
         auditId: number | null;
+        auditProgramId: number | null;
         description: string;
         severity: string;
+        rootCause: string | null;
         status: string;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
-        auditProgramId: number | null;
-        rootCause: string | null;
         assignedToId: number | null;
     }[]>;
     getOne(id: number): Promise<{
-        id: number;
         auditId: number | null;
+        auditProgramId: number | null;
         description: string;
         severity: string;
+        rootCause: string | null;
         status: string;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
-        auditProgramId: number | null;
-        rootCause: string | null;
         assignedToId: number | null;
     }>;
     getActionPlans(id: number): Promise<any>;
     getByAudit(auditId: number): Promise<{
-        id: number;
         auditId: number | null;
+        auditProgramId: number | null;
         description: string;
         severity: string;
+        rootCause: string | null;
         status: string;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
-        auditProgramId: number | null;
-        rootCause: string | null;
         assignedToId: number | null;
     }[]>;
     create(body: CreateFindingDto, req: any): Promise<{
-        id: number;
         auditId: number | null;
+        auditProgramId: number | null;
         description: string;
         severity: string;
+        rootCause: string | null;
         status: string;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
-        auditProgramId: number | null;
-        rootCause: string | null;
         assignedToId: number | null;
     }>;
     update(id: number, body: UpdateFindingDto): Promise<{
-        id: number;
         auditId: number | null;
+        auditProgramId: number | null;
         description: string;
         severity: string;
+        rootCause: string | null;
         status: string;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
-        auditProgramId: number | null;
-        rootCause: string | null;
         assignedToId: number | null;
     }>;
     delete(id: number): Promise<{
-        id: number;
         auditId: number | null;
+        auditProgramId: number | null;
         description: string;
         severity: string;
+        rootCause: string | null;
         status: string;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
-        auditProgramId: number | null;
-        rootCause: string | null;
         assignedToId: number | null;
     }>;
     assignAction(id: number, body: {
@@ -107,15 +107,15 @@ export declare class FindingController {
         success: boolean;
         message: string;
         finding: {
-            id: number;
             auditId: number | null;
+            auditProgramId: number | null;
             description: string;
             severity: string;
+            rootCause: string | null;
             status: string;
+            id: number;
             createdAt: Date;
             updatedAt: Date;
-            auditProgramId: number | null;
-            rootCause: string | null;
             assignedToId: number | null;
         };
         redirectTo: {
@@ -128,15 +128,15 @@ export declare class FindingController {
         userRole?: string;
         comment?: string;
     }): Promise<{
-        id: number;
         auditId: number | null;
+        auditProgramId: number | null;
         description: string;
         severity: string;
+        rootCause: string | null;
         status: string;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
-        auditProgramId: number | null;
-        rootCause: string | null;
         assignedToId: number | null;
     }>;
     getAllowedTransitions(id: number): Promise<{

@@ -62,16 +62,16 @@ let FindingWorkflowService = class FindingWorkflowService {
                 [FindingStatus.VALIDATED]: ['Audit Manager', 'Manager'],
             },
             [FindingStatus.VALIDATED]: {
-                [FindingStatus.ACTION_ASSIGNED]: ['Chief Auditor'],
+                [FindingStatus.ACTION_ASSIGNED]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
             },
             [FindingStatus.ACTION_ASSIGNED]: {
-                [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Chief Auditor'],
+                [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
             },
             [FindingStatus.REMEDIATION_IN_PROGRESS]: {
-                [FindingStatus.VERIFIED]: ['Chief Auditor'],
+                [FindingStatus.VERIFIED]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
             },
             [FindingStatus.VERIFIED]: {
-                [FindingStatus.CLOSED]: ['Chief Auditor'],
+                [FindingStatus.CLOSED]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
             },
         };
         return transitions[fromStatus]?.[toStatus] || [];

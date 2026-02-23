@@ -195,7 +195,7 @@ export class AuditService {
           userRoles: {
             some: {
               role: {
-                roleName: { in: ['Chief Auditor'] }
+                roleName: { in: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
               }
             }
           }
@@ -372,7 +372,7 @@ export class AuditService {
             userRoles: {
               some: {
                 role: {
-                  roleName: { in: ['Chief Auditor'] }
+                  roleName: { in: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
                 }
               }
             }

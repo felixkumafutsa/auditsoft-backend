@@ -25,7 +25,7 @@ export class AuditController {
   constructor(
     private auditService: AuditService,
     private workflowService: AuditWorkflowService,
-  ) {}
+  ) { }
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -60,8 +60,8 @@ export class AuditController {
     if (body.status === 'Approved') {
       const user = req.user;
       const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
-      const isChiefAuditor = roles.includes('Chief Auditor');
-      
+      const isChiefAuditor = roles.some(role => ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'].includes(role));
+
       if (!isChiefAuditor) {
         throw new ForbiddenException('Only Chief Auditor can approve audits.');
       }
@@ -90,14 +90,14 @@ export class AuditController {
   @Get(':id/programs')
   async getPrograms(@Param('id', ParseIntPipe) id: number) {
     const audit = await this.auditService.findOne(id);
-     
+
     return (audit as any).auditPrograms || [];
   }
 
   @Get(':id/findings')
   async getFindings(@Param('id', ParseIntPipe) id: number) {
     const audit = await this.auditService.findOne(id);
-     
+
     return (audit as any).findings || [];
   }
 
@@ -144,7 +144,7 @@ export class AuditController {
       ),
     }));
   }
-  
+
   @Post(':id/chief-auditor-comments')
   @HttpCode(200)
   async saveChiefAuditorComments(

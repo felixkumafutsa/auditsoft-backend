@@ -209,7 +209,7 @@ let FindingService = class FindingService {
                         userRoles: {
                             some: {
                                 role: {
-                                    roleName: { in: ['Chief Auditor'] }
+                                    roleName: { in: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
                                 }
                             }
                         }
@@ -380,7 +380,7 @@ let FindingService = class FindingService {
                         userRoles: {
                             some: {
                                 role: {
-                                    roleName: { in: ['Chief Auditor'] }
+                                    roleName: { in: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'] }
                                 }
                             }
                         }

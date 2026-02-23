@@ -33,8 +33,9 @@ export class EvidenceService {
 
       // Verify access to the audit and status
       const audit = await this.auditService.findOne(auditProgram.auditId, user);
-      if (audit.status !== 'In Progress') {
-        throw new BadRequestException(`Evidence can only be uploaded for audits that are 'In Progress'. Current status: ${audit.status}`);
+      const allowedStatuses = ['In Progress', 'Under Review', 'Execution Finished', 'Process Owner Review'];
+      if (!allowedStatuses.includes(audit.status)) {
+        throw new BadRequestException(`Evidence can only be uploaded for audits that are 'In Progress' or 'Under Review'. Current status: ${audit.status}`);
       }
     }
 
@@ -108,7 +109,14 @@ export class EvidenceService {
   async findAll(auditProgramId: number) {
     const items = await this.prisma.evidence.findMany({
       where: { auditProgramId },
-      include: { uploadedBy: true },
+      include: {
+        uploadedBy: true,
+        auditProgram: {
+          include: {
+            audit: true
+          }
+        }
+      },
     });
     return this.attachFileStatus(items);
   }
@@ -165,6 +173,11 @@ export class EvidenceService {
       where: { id },
       include: {
         uploadedBy: true,
+        auditProgram: {
+          include: {
+            audit: true
+          }
+        },
         versions: {
           orderBy: { version: 'desc' },
           include: { uploadedBy: true }
