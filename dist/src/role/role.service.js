@@ -12,16 +12,36 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.RoleService = exports.UpdateRoleDto = exports.CreateRoleDto = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
+const class_validator_1 = require("class-validator");
 class CreateRoleDto {
     roleName;
     description;
 }
 exports.CreateRoleDto = CreateRoleDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateRoleDto.prototype, "roleName", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateRoleDto.prototype, "description", void 0);
 class UpdateRoleDto {
     roleName;
     description;
 }
 exports.UpdateRoleDto = UpdateRoleDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateRoleDto.prototype, "roleName", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateRoleDto.prototype, "description", void 0);
 let RoleService = class RoleService {
     prisma;
     constructor(prisma) {

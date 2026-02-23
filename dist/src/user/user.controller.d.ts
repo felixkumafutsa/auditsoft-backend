@@ -4,11 +4,11 @@ export declare class UserController {
     constructor(userService: UserService);
     getProfile(req: any): Promise<Omit<{
         name: string;
-        id: number;
         email: string;
-        passwordHash: string;
         status: string;
         mfaEnabled: boolean;
+        id: number;
+        passwordHash: string;
         createdAt: Date;
         updatedAt: Date;
     }, "passwordHash">>;
@@ -16,41 +16,41 @@ export declare class UserController {
     getAll(): Promise<any[]>;
     getOne(id: number): Promise<Omit<{
         name: string;
-        id: number;
         email: string;
-        passwordHash: string;
         status: string;
         mfaEnabled: boolean;
+        id: number;
+        passwordHash: string;
         createdAt: Date;
         updatedAt: Date;
     }, "passwordHash">>;
     create(data: CreateUserDto): Promise<Omit<{
         name: string;
-        id: number;
         email: string;
-        passwordHash: string;
         status: string;
         mfaEnabled: boolean;
+        id: number;
+        passwordHash: string;
         createdAt: Date;
         updatedAt: Date;
     }, "passwordHash">>;
     update(id: number, data: UpdateUserDto): Promise<Omit<{
         name: string;
-        id: number;
         email: string;
-        passwordHash: string;
         status: string;
         mfaEnabled: boolean;
+        id: number;
+        passwordHash: string;
         createdAt: Date;
         updatedAt: Date;
     }, "passwordHash">>;
     delete(id: number): Promise<Omit<{
         name: string;
-        id: number;
         email: string;
-        passwordHash: string;
         status: string;
         mfaEnabled: boolean;
+        id: number;
+        passwordHash: string;
         createdAt: Date;
         updatedAt: Date;
     }, "passwordHash">>;
@@ -58,11 +58,11 @@ export declare class UserController {
     removeRole(userId: number, roleId: number): Promise<void>;
     createProcessOwner(data: CreateProcessOwnerDto): Promise<Omit<{
         name: string;
-        id: number;
         email: string;
-        passwordHash: string;
         status: string;
         mfaEnabled: boolean;
+        id: number;
+        passwordHash: string;
         createdAt: Date;
         updatedAt: Date;
     }, "passwordHash">>;

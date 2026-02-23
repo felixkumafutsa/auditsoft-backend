@@ -6,6 +6,7 @@ export declare class CreateUserDto {
     password: string;
     status?: string;
     mfaEnabled?: boolean;
+    auditUniverseEntityIds?: number[];
 }
 export declare class UpdateUserDto {
     name?: string;
@@ -13,6 +14,7 @@ export declare class UpdateUserDto {
     password?: string;
     status?: string;
     mfaEnabled?: boolean;
+    auditUniverseEntityIds?: number[];
 }
 export declare class CreateProcessOwnerDto {
     name: string;

@@ -3,35 +3,78 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { User } from '@prisma/client';
 import { scrypt, randomBytes } from 'crypto';
 import { promisify } from 'util';
+import { IsString, IsEmail, IsOptional, IsBoolean, IsArray, IsNumber } from 'class-validator';
 
 const scryptAsync = promisify(scrypt);
 
 export class CreateUserDto {
+  @IsString()
   name: string;
+
+  @IsEmail()
   email: string;
+
+  @IsString()
   password: string;
+
+  @IsOptional()
+  @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsBoolean()
   mfaEnabled?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  auditUniverseEntityIds?: number[];
 }
 
 export class UpdateUserDto {
+  @IsOptional()
+  @IsString()
   name?: string;
+
+  @IsOptional()
+  @IsEmail()
   email?: string;
+
+  @IsOptional()
+  @IsString()
   password?: string;
+
+  @IsOptional()
+  @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsBoolean()
   mfaEnabled?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  auditUniverseEntityIds?: number[];
 }
 
 export class CreateProcessOwnerDto {
+  @IsString()
   name: string;
+
+  @IsEmail()
   email: string;
+
+  @IsString()
   password: string;
+
+  @IsNumber()
   auditUniverseId: number;
 }
 
 @Injectable()
 export class UserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   private async hashPassword(password: string): Promise<string> {
     const salt = randomBytes(16).toString('hex');
@@ -109,6 +152,9 @@ export class UserService {
         passwordHash: passwordHash,
         status: data.status || 'active',
         mfaEnabled: data.mfaEnabled || false,
+        auditUniverseOwner: data.auditUniverseEntityIds ? {
+          connect: data.auditUniverseEntityIds.map(id => ({ id }))
+        } : undefined,
       },
       select: {
         id: true,
@@ -146,6 +192,9 @@ export class UserService {
         status: data.status,
         mfaEnabled: data.mfaEnabled,
         passwordHash: passwordHash,
+        auditUniverseOwner: data.auditUniverseEntityIds ? {
+          set: data.auditUniverseEntityIds.map(id => ({ id }))
+        } : undefined,
       },
       select: {
         id: true,
@@ -192,11 +241,11 @@ export class UserService {
 
     // Prevent duplicate role assignments
     const existingAssignment = await this.prisma.userRole.findUnique({
-        where: { userId_roleId: { userId, roleId } },
+      where: { userId_roleId: { userId, roleId } },
     });
 
     if (existingAssignment) {
-        throw new BadRequestException('User already has this role');
+      throw new BadRequestException('User already has this role');
     }
 
     return this.prisma.userRole.create({

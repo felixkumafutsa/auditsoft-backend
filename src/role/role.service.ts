@@ -2,19 +2,30 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../../prisma/prisma.service';
 import { Role } from '@prisma/client';
 
+import { IsString, IsOptional } from 'class-validator';
+
 export class CreateRoleDto {
+  @IsString()
   roleName: string;
+
+  @IsOptional()
+  @IsString()
   description?: string;
 }
 
 export class UpdateRoleDto {
+  @IsOptional()
+  @IsString()
   roleName?: string;
+
+  @IsOptional()
+  @IsString()
   description?: string;
 }
 
 @Injectable()
 export class RoleService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findAll(): Promise<Role[]> {
     return this.prisma.role.findMany({

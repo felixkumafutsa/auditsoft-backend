@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const crypto_1 = require("crypto");
 const util_1 = require("util");
+const class_validator_1 = require("class-validator");
 const scryptAsync = (0, util_1.promisify)(crypto_1.scrypt);
 class CreateUserDto {
     name;
@@ -21,16 +22,77 @@ class CreateUserDto {
     password;
     status;
     mfaEnabled;
+    auditUniverseEntityIds;
 }
 exports.CreateUserDto = CreateUserDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateUserDto.prototype, "name", void 0);
+__decorate([
+    (0, class_validator_1.IsEmail)(),
+    __metadata("design:type", String)
+], CreateUserDto.prototype, "email", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateUserDto.prototype, "password", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateUserDto.prototype, "status", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateUserDto.prototype, "mfaEnabled", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsNumber)({}, { each: true }),
+    __metadata("design:type", Array)
+], CreateUserDto.prototype, "auditUniverseEntityIds", void 0);
 class UpdateUserDto {
     name;
     email;
     password;
     status;
     mfaEnabled;
+    auditUniverseEntityIds;
 }
 exports.UpdateUserDto = UpdateUserDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateUserDto.prototype, "name", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEmail)(),
+    __metadata("design:type", String)
+], UpdateUserDto.prototype, "email", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateUserDto.prototype, "password", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateUserDto.prototype, "status", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdateUserDto.prototype, "mfaEnabled", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsNumber)({}, { each: true }),
+    __metadata("design:type", Array)
+], UpdateUserDto.prototype, "auditUniverseEntityIds", void 0);
 class CreateProcessOwnerDto {
     name;
     email;
@@ -38,6 +100,22 @@ class CreateProcessOwnerDto {
     auditUniverseId;
 }
 exports.CreateProcessOwnerDto = CreateProcessOwnerDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateProcessOwnerDto.prototype, "name", void 0);
+__decorate([
+    (0, class_validator_1.IsEmail)(),
+    __metadata("design:type", String)
+], CreateProcessOwnerDto.prototype, "email", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateProcessOwnerDto.prototype, "password", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], CreateProcessOwnerDto.prototype, "auditUniverseId", void 0);
 let UserService = class UserService {
     prisma;
     constructor(prisma) {
@@ -109,6 +187,9 @@ let UserService = class UserService {
                 passwordHash: passwordHash,
                 status: data.status || 'active',
                 mfaEnabled: data.mfaEnabled || false,
+                auditUniverseOwner: data.auditUniverseEntityIds ? {
+                    connect: data.auditUniverseEntityIds.map(id => ({ id }))
+                } : undefined,
             },
             select: {
                 id: true,
@@ -142,6 +223,9 @@ let UserService = class UserService {
                 status: data.status,
                 mfaEnabled: data.mfaEnabled,
                 passwordHash: passwordHash,
+                auditUniverseOwner: data.auditUniverseEntityIds ? {
+                    set: data.auditUniverseEntityIds.map(id => ({ id }))
+                } : undefined,
             },
             select: {
                 id: true,
