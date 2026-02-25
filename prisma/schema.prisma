@@ -9,30 +9,32 @@ datasource db {
 }
 
 model User {
-  id                 Int               @id @default(autoincrement())
-  name               String
-  email              String            @unique
-  passwordHash       String
-  status             String            @default("active")
-  mfaEnabled         Boolean           @default(false)
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  actionPlanOwner    ActionPlan[]
-  managedAudits      Audit[]           @relation("auditManager")
-  auditLogActivity   AuditLog[]
-  auditUniverseOwner AuditUniverse[]
-  uploadedEvidence   Evidence[]
-  evidenceVersions   EvidenceVersion[]
-  assignedFindings   Finding[]         @relation("FindingAssignee")
-  krisOwned          KRI[]
-  receivedMessages   Message[]         @relation("ReceivedMessages")
-  sentMessages       Message[]         @relation("SentMessages")
-  notifications      Notification[]
-  generatedReports   Report[]
-  risksOwned         Risk[]            @relation("RiskOwner")
-  userRoles          UserRole[]
-  assignedAudits     Audit[]           @relation("auditAuditors")
-  timesheets         Timesheet[]
+  id                      Int               @id @default(autoincrement())
+  name                    String
+  email                   String            @unique
+  passwordHash            String
+  status                  String            @default("active")
+  mfaEnabled              Boolean           @default(false)
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  profilePicture          String?
+  actionPlanOwner         ActionPlan[]
+  managedAudits           Audit[]           @relation("auditManager")
+  executiveApprovedAudits Audit[]           @relation("auditExecutiveApprover")
+  auditLogActivity        AuditLog[]
+  auditUniverseOwner      AuditUniverse[]
+  uploadedEvidence        Evidence[]
+  evidenceVersions        EvidenceVersion[]
+  assignedFindings        Finding[]         @relation("FindingAssignee")
+  krisOwned               KRI[]
+  receivedMessages        Message[]         @relation("ReceivedMessages")
+  sentMessages            Message[]         @relation("SentMessages")
+  notifications           Notification[]
+  generatedReports        Report[]
+  risksOwned              Risk[]            @relation("RiskOwner")
+  timesheets              Timesheet[]
+  userRoles               UserRole[]
+  assignedAudits          Audit[]           @relation("auditAuditors")
 }
 
 model Message {
@@ -86,45 +88,66 @@ model AuditUniverse {
 }
 
 model Audit {
-  id                Int            @id @default(autoincrement())
-  status            String         @default("Planned")
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  assignedManagerId Int?
-  auditName         String
-  auditType         String
-  auditUniverseId   Int?
-  endDate           DateTime?
-  startDate         DateTime?
-  chiefAuditorComments String?
-  assignedManager   User?          @relation("auditManager", fields: [assignedManagerId], references: [id])
-  auditUniverse     AuditUniverse? @relation(fields: [auditUniverseId], references: [id])
-  auditPrograms     AuditProgram[]
-  findings          Finding[]
-  reports           Report[]
-  risks             Risk[]         @relation("AuditRisks")
-  assignedAuditors  User[]         @relation("auditAuditors")
-  timesheets        Timesheet[]
+  id                    Int            @id @default(autoincrement())
+  status                String         @default("Planned")
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  assignedManagerId     Int?
+  auditName             String
+  auditType             String
+  auditUniverseId       Int?
+  endDate               DateTime?
+  startDate             DateTime?
+  chiefAuditorComments  String?
+  budgetAllocation      Float?
+  executiveApproval     Boolean        @default(false)
+  executiveApprovedAt   DateTime?
+  executiveApprovedById Int?
+  justification         String?        @db.LongText
+  priority              String?
+  quarter               String?
+  resourceHours         Float?
+  riskLevel             String?
+  riskScore             Int?
+  year                  Int?
+  assignedManager       User?          @relation("auditManager", fields: [assignedManagerId], references: [id])
+  auditUniverse         AuditUniverse? @relation(fields: [auditUniverseId], references: [id])
+  executiveApprover     User?          @relation("auditExecutiveApprover", fields: [executiveApprovedById], references: [id])
+  auditPrograms         AuditProgram[]
+  findings              Finding[]
+  reports               Report[]
+  timesheets            Timesheet[]
+  risks                 Risk[]         @relation("AuditRisks")
+  assignedAuditors      User[]         @relation("auditAuditors")
 
   @@index([assignedManagerId], map: "Audit_assignedManagerId_fkey")
   @@index([auditUniverseId], map: "Audit_auditUniverseId_fkey")
+  @@index([executiveApprovedById], map: "Audit_executiveApprovedById_fkey")
 }
 
 model AuditProgram {
-  id               Int              @id @default(autoincrement())
-  auditId          Int
-  procedureName    String
-  controlReference String?
-  expectedOutcome  String?
-  actualResult     String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  reviewerComment  String?
-  audit            Audit            @relation(fields: [auditId], references: [id], onDelete: Cascade)
-  controlMappings  ControlMapping[]
-  evidence         Evidence[]
-  findings         Finding[]
-  workpaper        Workpaper?
+  id                   Int              @id @default(autoincrement())
+  auditId              Int
+  procedureName        String
+  controlReference     String?
+  expectedOutcome      String?
+  actualResult         String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  reviewerComment      String?
+  confidenceLevel      Float?
+  documentationReq     String?          @db.LongText
+  evidenceRequired     String?          @db.LongText
+  materialityThreshold Float?
+  sampleSize           Int?
+  samplingApproach     String?
+  stepByStepProcedure  String?          @db.LongText
+  testMethod           String?
+  audit                Audit            @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  controlMappings      ControlMapping[]
+  evidence             Evidence[]
+  findings             Finding[]
+  workpaper            Workpaper?
 
   @@index([auditId], map: "AuditProgram_auditId_fkey")
 }
@@ -190,13 +213,14 @@ model Finding {
   status         String        @default("Identified")
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  assignedToId   Int?
   auditProgramId Int?
   rootCause      String?
-  assignedToId   Int?
   actionPlans    ActionPlan[]
   assignedTo     User?         @relation("FindingAssignee", fields: [assignedToId], references: [id])
+  audit          Audit?        @relation(fields: [auditId], references: [id], onDelete: Cascade)
   auditProgram   AuditProgram? @relation(fields: [auditProgramId], references: [id])
-  audit          Audit?         @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
   @@index([assignedToId], map: "Finding_assignedToId_fkey")
   @@index([auditId], map: "Finding_auditId_fkey")
   @@index([auditProgramId], map: "Finding_auditProgramId_fkey")
@@ -209,8 +233,8 @@ model ActionPlan {
   status      String    @default("open")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  ownerId     Int?
   description String
+  ownerId     Int?
   finding     Finding   @relation(fields: [findingId], references: [id], onDelete: Cascade)
   owner       User?     @relation(fields: [ownerId], references: [id])
 
@@ -320,49 +344,43 @@ model ControlRun {
 }
 
 model Risk {
-  id          Int      @id @default(autoincrement())
-  riskId      String   @unique
-  title       String
-  description String?
-  category    String
-  
-  // Inherent Risk
-  impact             String  @default("Medium") // Kept for backward compatibility or UI choice
-  likelihood         String  @default("Medium") // Kept for backward compatibility or UI choice
+  id                 Int      @id @default(autoincrement())
+  riskId             String   @unique
+  title              String
+  description        String?
+  category           String
+  impact             String   @default("Medium")
+  likelihood         String   @default("Medium")
+  status             String   @default("open")
+  ownerId            Int?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
   inherentImpact     String?
   inherentLikelihood String?
   inherentScore      Int?
-  
-  // Residual Risk
   residualImpact     String?
   residualLikelihood String?
   residualScore      Int?
-  
-  status      String   @default("open")
-  ownerId     Int?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  kris        KRI[]
-  owner       User?    @relation("RiskOwner", fields: [ownerId], references: [id])
-  audits      Audit[]  @relation("AuditRisks")
+  kris               KRI[]
+  owner              User?    @relation("RiskOwner", fields: [ownerId], references: [id])
+  audits             Audit[]  @relation("AuditRisks")
 
   @@index([ownerId], map: "Risk_ownerId_fkey")
 }
 
 model Workpaper {
-  id               Int            @id @default(autoincrement())
-  auditProgramId   Int            @unique
-  title            String
-  description      String?
-  conclusion       String?        // Pass/Fail/Partial
-  testResults      String?        @db.LongText
-  preparedById     Int?
-  reviewedById     Int?
-  status           String         @default("Draft") // Draft, Pending Review, Reviewed
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  
-  auditProgram     AuditProgram   @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
+  id             Int          @id @default(autoincrement())
+  auditProgramId Int          @unique
+  title          String
+  description    String?
+  conclusion     String?
+  testResults    String?      @db.LongText
+  preparedById   Int?
+  reviewedById   Int?
+  status         String       @default("Draft")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  auditProgram   AuditProgram @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
 }
 
 model Timesheet {
@@ -373,9 +391,11 @@ model Timesheet {
   workDate  DateTime
   activity  String?
   createdAt DateTime @default(now())
-  
   audit     Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([auditId], map: "Timesheet_auditId_fkey")
+  @@index([userId], map: "Timesheet_userId_fkey")
 }
 
 model KRI {
