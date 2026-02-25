@@ -13,6 +13,7 @@ const swagger_1 = require("@nestjs/swagger");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
 const audit_module_1 = require("./audit/audit.module");
+const audit_plan_module_1 = require("./audit-plan/audit-plan.module");
 const user_module_1 = require("./user/user.module");
 const role_module_1 = require("./role/role.module");
 const auth_module_1 = require("./auth/auth.module");
@@ -43,6 +44,7 @@ exports.AppModule = AppModule = __decorate([
             config_1.ConfigModule.forRoot(),
             swagger_1.SwaggerModule,
             audit_module_1.AuditModule,
+            audit_plan_module_1.AuditPlanModule,
             audit_program_module_1.AuditProgramModule,
             evidence_module_1.EvidenceModule,
             finding_module_1.FindingModule,

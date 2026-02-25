@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsNumber } from 'class-validator';
 
 export class UpdateAuditProgramDto {
   @IsString()
@@ -20,4 +20,37 @@ export class UpdateAuditProgramDto {
   @IsString()
   @IsOptional()
   reviewerComment?: string;
+
+  // Enhanced Operational Fields
+  @IsString()
+  @IsOptional()
+  samplingApproach?: string;
+
+  @IsNumber()
+  @IsOptional()
+  sampleSize?: number;
+
+  @IsNumber()
+  @IsOptional()
+  confidenceLevel?: number;
+
+  @IsNumber()
+  @IsOptional()
+  materialityThreshold?: number;
+
+  @IsString()
+  @IsOptional()
+  testMethod?: string;
+
+  @IsString()
+  @IsOptional()
+  evidenceRequired?: string;
+
+  @IsString()
+  @IsOptional()
+  documentationReq?: string;
+
+  @IsString()
+  @IsOptional()
+  stepByStepProcedure?: string;
 }

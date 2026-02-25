@@ -7,6 +7,18 @@ export declare class UserController {
         email: string;
         status: string;
         mfaEnabled: boolean;
+        profilePicture: string | null;
+        id: number;
+        passwordHash: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }, "passwordHash">>;
+    updateProfile(file: Express.Multer.File, data: UpdateUserDto, req: any): Promise<Omit<{
+        name: string;
+        email: string;
+        status: string;
+        mfaEnabled: boolean;
+        profilePicture: string | null;
         id: number;
         passwordHash: string;
         createdAt: Date;
@@ -19,6 +31,7 @@ export declare class UserController {
         email: string;
         status: string;
         mfaEnabled: boolean;
+        profilePicture: string | null;
         id: number;
         passwordHash: string;
         createdAt: Date;
@@ -29,6 +42,7 @@ export declare class UserController {
         email: string;
         status: string;
         mfaEnabled: boolean;
+        profilePicture: string | null;
         id: number;
         passwordHash: string;
         createdAt: Date;
@@ -39,6 +53,7 @@ export declare class UserController {
         email: string;
         status: string;
         mfaEnabled: boolean;
+        profilePicture: string | null;
         id: number;
         passwordHash: string;
         createdAt: Date;
@@ -49,6 +64,7 @@ export declare class UserController {
         email: string;
         status: string;
         mfaEnabled: boolean;
+        profilePicture: string | null;
         id: number;
         passwordHash: string;
         createdAt: Date;
@@ -61,6 +77,7 @@ export declare class UserController {
         email: string;
         status: string;
         mfaEnabled: boolean;
+        profilePicture: string | null;
         id: number;
         passwordHash: string;
         createdAt: Date;

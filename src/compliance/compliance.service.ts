@@ -4,6 +4,8 @@ import { CreateFrameworkDto } from './dto/create-framework.dto';
 import { UpdateFrameworkDto } from './dto/update-framework.dto';
 import { CreateControlMappingDto } from './dto/create-control-mapping.dto';
 import { UpdateControlMappingDto } from './dto/update-control-mapping.dto';
+import { promises as fs } from 'fs';
+import { join, basename } from 'path';
 
 @Injectable()
 export class ComplianceService {
@@ -15,6 +17,37 @@ export class ComplianceService {
     return this.prisma.complianceFramework.findMany({
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  // --- Policies ---
+
+  async findAllPolicies() {
+    return this.prisma.policy.findMany({ orderBy: { createdAt: 'desc' } });
+  }
+
+  async findOnePolicy(id: number) {
+    const policy = await this.prisma.policy.findUnique({ where: { id } });
+    if (!policy) throw new NotFoundException(`Policy with ID ${id} not found`);
+    return policy;
+  }
+
+  async deletePolicy(id: number) {
+    const policy = await this.prisma.policy.findUnique({ where: { id } });
+    if (!policy) throw new NotFoundException(`Policy with ID ${id} not found`);
+
+    // Attempt to delete file from disk if present
+    if (policy.fileUrl) {
+      try {
+        const filename = basename(policy.fileUrl);
+        const filePath = join(process.cwd(), 'uploads', 'policy-documents', filename);
+        await fs.stat(filePath);
+        await fs.unlink(filePath);
+      } catch (err) {
+        // ignore file deletion errors, proceed to delete DB record
+      }
+    }
+
+    return this.prisma.policy.delete({ where: { id } });
   }
 
   async findOneFramework(id: number) {

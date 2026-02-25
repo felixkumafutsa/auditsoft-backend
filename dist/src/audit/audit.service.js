@@ -25,6 +25,14 @@ class CreateAuditDto {
     auditUniverseId;
     assignedAuditorIds;
     templateId;
+    riskScore;
+    riskLevel;
+    priority;
+    quarter;
+    year;
+    resourceHours;
+    budgetAllocation;
+    justification;
 }
 exports.CreateAuditDto = CreateAuditDto;
 __decorate([
@@ -70,6 +78,46 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Number)
 ], CreateAuditDto.prototype, "templateId", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], CreateAuditDto.prototype, "riskScore", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateAuditDto.prototype, "riskLevel", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateAuditDto.prototype, "priority", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateAuditDto.prototype, "quarter", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], CreateAuditDto.prototype, "year", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], CreateAuditDto.prototype, "resourceHours", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], CreateAuditDto.prototype, "budgetAllocation", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateAuditDto.prototype, "justification", void 0);
 class UpdateAuditDto {
     auditName;
     auditType;
@@ -80,6 +128,16 @@ class UpdateAuditDto {
     auditUniverseId;
     assignedAuditorIds;
     chiefAuditorComments;
+    riskScore;
+    riskLevel;
+    priority;
+    quarter;
+    year;
+    resourceHours;
+    budgetAllocation;
+    justification;
+    executiveApproval;
+    executiveApprovedById;
 }
 exports.UpdateAuditDto = UpdateAuditDto;
 __decorate([
@@ -127,6 +185,56 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], UpdateAuditDto.prototype, "chiefAuditorComments", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], UpdateAuditDto.prototype, "riskScore", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateAuditDto.prototype, "riskLevel", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateAuditDto.prototype, "priority", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateAuditDto.prototype, "quarter", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], UpdateAuditDto.prototype, "year", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], UpdateAuditDto.prototype, "resourceHours", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], UpdateAuditDto.prototype, "budgetAllocation", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateAuditDto.prototype, "justification", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], UpdateAuditDto.prototype, "executiveApproval", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], UpdateAuditDto.prototype, "executiveApprovedById", void 0);
 let AuditService = class AuditService {
     prisma;
     notificationService;
@@ -231,6 +339,14 @@ let AuditService = class AuditService {
                 endDate: data.endDate,
                 assignedManagerId: data.assignedManagerId,
                 auditUniverseId: data.auditUniverseId,
+                riskScore: data.riskScore,
+                riskLevel: data.riskLevel,
+                priority: data.priority,
+                quarter: data.quarter,
+                year: data.year,
+                resourceHours: data.resourceHours,
+                budgetAllocation: data.budgetAllocation,
+                justification: data.justification,
                 assignedAuditors: data.assignedAuditorIds ? {
                     connect: data.assignedAuditorIds.map(id => ({ id }))
                 } : undefined,
@@ -288,7 +404,7 @@ let AuditService = class AuditService {
         if (!existingAudit) {
             throw new common_1.NotFoundException(`Audit with ID ${id} not found`);
         }
-        const { auditName, auditType, status, startDate, endDate, assignedManagerId, auditUniverseId, assignedAuditorIds, chiefAuditorComments } = data;
+        const { auditName, auditType, status, startDate, endDate, assignedManagerId, auditUniverseId, assignedAuditorIds, chiefAuditorComments, riskScore, riskLevel, priority, quarter, year, resourceHours, budgetAllocation, justification, executiveApproval, executiveApprovedById } = data;
         const updateData = {
             ...(auditName !== undefined && { auditName }),
             ...(auditType !== undefined && { auditType }),
@@ -298,6 +414,16 @@ let AuditService = class AuditService {
             ...(assignedManagerId !== undefined && { assignedManagerId }),
             ...(auditUniverseId !== undefined && { auditUniverseId }),
             ...(chiefAuditorComments !== undefined && { chiefAuditorComments }),
+            ...(riskScore !== undefined && { riskScore }),
+            ...(riskLevel !== undefined && { riskLevel }),
+            ...(priority !== undefined && { priority }),
+            ...(quarter !== undefined && { quarter }),
+            ...(year !== undefined && { year }),
+            ...(resourceHours !== undefined && { resourceHours }),
+            ...(budgetAllocation !== undefined && { budgetAllocation }),
+            ...(justification !== undefined && { justification }),
+            ...(executiveApproval !== undefined && { executiveApproval }),
+            ...(executiveApprovedById !== undefined && { executiveApprovedById }),
         };
         if (assignedAuditorIds) {
             updateData.assignedAuditors = {

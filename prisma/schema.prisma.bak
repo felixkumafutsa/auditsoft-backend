@@ -1,0 +1,446 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x", "linux-musl", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 Int               @id @default(autoincrement())
+  name               String
+  email              String            @unique
+  passwordHash       String
+  status             String            @default("active")
+  mfaEnabled         Boolean           @default(false)
+  profilePicture     String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  actionPlanOwner    ActionPlan[]
+  managedAudits      Audit[]           @relation("auditManager")
+  auditLogActivity   AuditLog[]
+  auditUniverseOwner AuditUniverse[]
+  uploadedEvidence   Evidence[]
+  evidenceVersions   EvidenceVersion[]
+  assignedFindings   Finding[]         @relation("FindingAssignee")
+  krisOwned          KRI[]
+  receivedMessages   Message[]         @relation("ReceivedMessages")
+  sentMessages       Message[]         @relation("SentMessages")
+  notifications      Notification[]
+  generatedReports   Report[]
+  risksOwned         Risk[]            @relation("RiskOwner")
+  userRoles          UserRole[]
+  assignedAudits     Audit[]           @relation("auditAuditors")
+  timesheets         Timesheet[]
+  executiveApprovedAudits Audit[]       @relation("auditExecutiveApprover")
+}
+
+model Message {
+  id         Int      @id @default(autoincrement())
+  senderId   Int
+  receiverId Int
+  content    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([receiverId], map: "Message_receiverId_fkey")
+  @@index([senderId], map: "Message_senderId_fkey")
+}
+
+model Role {
+  id          Int        @id @default(autoincrement())
+  roleName    String     @unique
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  userRoles   UserRole[]
+}
+
+model UserRole {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  roleId     Int
+  assignedAt DateTime  @default(now())
+  revokedAt  DateTime?
+  role       Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([roleId], map: "UserRole_roleId_fkey")
+}
+
+model AuditUniverse {
+  id         Int      @id @default(autoincrement())
+  entityType String
+  entityName String
+  riskRating String
+  ownerId    Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  audits     Audit[]
+  owner      User     @relation(fields: [ownerId], references: [id])
+
+  @@index([ownerId], map: "AuditUniverse_ownerId_fkey")
+}
+
+model Audit {
+  id                Int            @id @default(autoincrement())
+  status            String         @default("Planned")
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  assignedManagerId Int?
+  auditName         String
+  auditType         String
+  auditUniverseId   Int?
+  endDate           DateTime?
+  startDate         DateTime?
+  chiefAuditorComments String?
+  
+  // Strategic Audit Plan Fields
+  riskScore         Int?           // Risk exposure score (1-10)
+  riskLevel         String?         // Low, Medium, High, Critical
+  priority          String?         // High, Medium, Low based on risk
+  quarter           String?         // Q1, Q2, Q3, Q4
+  year              Int?           // Audit year for annual planning
+  resourceHours     Float?          // Estimated resource hours required
+  budgetAllocation  Float?          // Budget allocation for the audit
+  executiveApproval Boolean         @default(false)
+  executiveApprovedAt DateTime?
+  executiveApprovedById Int?
+  justification     String?        @db.LongText  // Business justification for the audit
+  
+  assignedManager   User?          @relation("auditManager", fields: [assignedManagerId], references: [id])
+  auditUniverse     AuditUniverse? @relation(fields: [auditUniverseId], references: [id])
+  auditPrograms     AuditProgram[]
+  findings          Finding[]
+  reports           Report[]
+  risks             Risk[]         @relation("AuditRisks")
+  assignedAuditors  User[]         @relation("auditAuditors")
+  timesheets        Timesheet[]
+  executiveApprover User?          @relation("auditExecutiveApprover", fields: [executiveApprovedById], references: [id])
+
+  @@index([assignedManagerId], map: "Audit_assignedManagerId_fkey")
+  @@index([auditUniverseId], map: "Audit_auditUniverseId_fkey")
+  @@index([executiveApprovedById], map: "Audit_executiveApprovedById_fkey")
+}
+
+model AuditProgram {
+  id               Int              @id @default(autoincrement())
+  auditId          Int
+  procedureName    String
+  controlReference String?
+  expectedOutcome  String?
+  actualResult     String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  reviewerComment  String?
+  
+  // Enhanced Operational Fields
+  samplingApproach String?          // Statistical, Judgmental, Random, etc.
+  sampleSize       Int?             // Number of items to test
+  confidenceLevel  Float?           // Confidence level for sampling (90, 95, 99%)
+  materialityThreshold Float?       // Materiality threshold for testing
+  testMethod       String?          // Inquiry, Observation, Inspection, Reperformance, etc.
+  evidenceRequired String?          @db.LongText  // Specific evidence requirements
+  documentationReq String?          @db.LongText  // Documentation requirements
+  stepByStepProcedure String?      @db.LongText  // Detailed step-by-step procedures
+  
+  audit            Audit            @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  controlMappings  ControlMapping[]
+  evidence         Evidence[]
+  findings         Finding[]
+  workpaper        Workpaper?
+
+  @@index([auditId], map: "AuditProgram_auditId_fkey")
+}
+
+model Report {
+  id          Int      @id @default(autoincrement())
+  auditId     Int
+  title       String
+  generatedBy Int
+  generatedAt DateTime @default(now())
+  fileUrl     String?
+  fileType    String?
+  audit       Audit    @relation(fields: [auditId], references: [id])
+  generator   User     @relation(fields: [generatedBy], references: [id])
+
+  @@index([auditId], map: "Report_auditId_fkey")
+  @@index([generatedBy], map: "Report_generatedBy_fkey")
+}
+
+model Evidence {
+  id             Int               @id @default(autoincrement())
+  auditProgramId Int
+  fileName       String
+  fileType       String
+  fileHash       String
+  uploadedById   Int
+  uploadedAt     DateTime          @default(now())
+  description    String?
+  status         String            @default("active")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  currentVersion Int               @default(1)
+  auditProgram   AuditProgram      @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
+  uploadedBy     User              @relation(fields: [uploadedById], references: [id])
+  versions       EvidenceVersion[]
+
+  @@index([auditProgramId], map: "Evidence_auditProgramId_fkey")
+  @@index([uploadedById], map: "Evidence_uploadedById_fkey")
+}
+
+model EvidenceVersion {
+  id           Int      @id @default(autoincrement())
+  evidenceId   Int
+  fileName     String
+  fileType     String
+  fileHash     String
+  uploadedById Int
+  uploadedAt   DateTime @default(now())
+  description  String?
+  version      Int
+  evidence     Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+
+  @@index([evidenceId], map: "EvidenceVersion_evidenceId_fkey")
+  @@index([uploadedById], map: "EvidenceVersion_uploadedById_fkey")
+}
+
+model Finding {
+  id             Int           @id @default(autoincrement())
+  auditId        Int?
+  description    String
+  severity       String
+  status         String        @default("Identified")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  auditProgramId Int?
+  rootCause      String?
+  assignedToId   Int?
+  actionPlans    ActionPlan[]
+  assignedTo     User?         @relation("FindingAssignee", fields: [assignedToId], references: [id])
+  auditProgram   AuditProgram? @relation(fields: [auditProgramId], references: [id])
+  audit          Audit?         @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  @@index([assignedToId], map: "Finding_assignedToId_fkey")
+  @@index([auditId], map: "Finding_auditId_fkey")
+  @@index([auditProgramId], map: "Finding_auditProgramId_fkey")
+}
+
+model ActionPlan {
+  id          Int       @id @default(autoincrement())
+  findingId   Int
+  dueDate     DateTime?
+  status      String    @default("open")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  ownerId     Int?
+  description String
+  finding     Finding   @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  owner       User?     @relation(fields: [ownerId], references: [id])
+
+  @@index([findingId], map: "ActionPlan_findingId_fkey")
+  @@index([ownerId], map: "ActionPlan_ownerId_fkey")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  action     String
+  entityType String
+  entityId   Int?
+  timestamp  DateTime @default(now())
+  ipAddress  String?
+  deviceInfo String?
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId], map: "AuditLog_userId_fkey")
+}
+
+model ComplianceFramework {
+  id              Int              @id @default(autoincrement())
+  frameworkName   String
+  version         String
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  controlMappings ControlMapping[]
+  policyMappings  PolicyMapping[]
+}
+
+model Policy {
+  id             Int             @id @default(autoincrement())
+  policyName     String
+  version        String
+  description    String?
+  effectiveDate  DateTime        @default(now())
+  reviewDate     DateTime?
+  status         String          @default("Draft")
+  fileUrl        String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  policyMappings PolicyMapping[]
+}
+
+model PolicyMapping {
+  id          Int                 @id @default(autoincrement())
+  policyId    Int
+  frameworkId Int
+  createdAt   DateTime            @default(now())
+  framework   ComplianceFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  policy      Policy              @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, frameworkId])
+  @@index([frameworkId], map: "PolicyMapping_frameworkId_fkey")
+}
+
+model ControlMapping {
+  id             Int                 @id @default(autoincrement())
+  auditProgramId Int
+  frameworkId    Int
+  coverageStatus String
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  auditProgram   AuditProgram        @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
+  framework      ComplianceFramework @relation(fields: [frameworkId], references: [id])
+
+  @@unique([auditProgramId, frameworkId])
+  @@index([frameworkId], map: "ControlMapping_frameworkId_fkey")
+}
+
+model Integration {
+  id           Int       @id @default(autoincrement())
+  systemName   String    @unique
+  apiEndpoint  String?
+  lastSyncDate DateTime?
+  status       String    @default("active")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  config       String?   @db.LongText
+  type         String
+}
+
+model AutomatedControl {
+  id          Int          @id @default(autoincrement())
+  name        String
+  description String?
+  frequency   String
+  script      String
+  status      String       @default("active")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  controlRuns ControlRun[]
+}
+
+model ControlRun {
+  id                 Int              @id @default(autoincrement())
+  automatedControlId Int
+  runDate            DateTime         @default(now())
+  status             String
+  resultSummary      String?
+  createdAt          DateTime         @default(now())
+  automatedControl   AutomatedControl @relation(fields: [automatedControlId], references: [id], onDelete: Cascade)
+
+  @@index([automatedControlId], map: "ControlRun_automatedControlId_fkey")
+}
+
+model Risk {
+  id          Int      @id @default(autoincrement())
+  riskId      String   @unique
+  title       String
+  description String?
+  category    String
+  
+  // Inherent Risk
+  impact             String  @default("Medium") // Kept for backward compatibility or UI choice
+  likelihood         String  @default("Medium") // Kept for backward compatibility or UI choice
+  inherentImpact     String?
+  inherentLikelihood String?
+  inherentScore      Int?
+  
+  // Residual Risk
+  residualImpact     String?
+  residualLikelihood String?
+  residualScore      Int?
+  
+  status      String   @default("open")
+  ownerId     Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  kris        KRI[]
+  owner       User?    @relation("RiskOwner", fields: [ownerId], references: [id])
+  audits      Audit[]  @relation("AuditRisks")
+
+  @@index([ownerId], map: "Risk_ownerId_fkey")
+}
+
+model Workpaper {
+  id               Int            @id @default(autoincrement())
+  auditProgramId   Int            @unique
+  title            String
+  description      String?
+  conclusion       String?        // Pass/Fail/Partial
+  testResults      String?        @db.LongText
+  preparedById     Int?
+  reviewedById     Int?
+  status           String         @default("Draft") // Draft, Pending Review, Reviewed
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  
+  auditProgram     AuditProgram   @relation(fields: [auditProgramId], references: [id], onDelete: Cascade)
+}
+
+model Timesheet {
+  id        Int      @id @default(autoincrement())
+  auditId   Int
+  userId    Int
+  hours     Float
+  workDate  DateTime
+  activity  String?
+  createdAt DateTime @default(now())
+  
+  audit     Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model KRI {
+  id                Int      @id @default(autoincrement())
+  kriId             String   @unique
+  name              String
+  description       String?
+  metricType        String
+  targetValue       Float
+  warningThreshold  Float
+  criticalThreshold Float
+  currentValue      Float
+  status            String   @default("green")
+  frequency         String
+  riskId            Int?
+  ownerId           Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  owner             User?    @relation(fields: [ownerId], references: [id])
+  risk              Risk?    @relation(fields: [riskId], references: [id])
+
+  @@index([ownerId], map: "KRI_ownerId_fkey")
+  @@index([riskId], map: "KRI_riskId_fkey")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String
+  type      String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "Notification_userId_fkey")
+}

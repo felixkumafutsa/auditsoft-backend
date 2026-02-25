@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuditModule } from './audit/audit.module';
+import { AuditPlanModule } from './audit-plan/audit-plan.module';
 import { UserModule } from './user/user.module';
 import { RoleModule } from './role/role.module';
 import { AuthModule } from './auth/auth.module';
@@ -31,6 +32,7 @@ import { PrismaService } from '../prisma/prisma.service';
     ConfigModule.forRoot(),
     SwaggerModule,
     AuditModule,
+    AuditPlanModule,
     AuditProgramModule,
     EvidenceModule,
     FindingModule,

@@ -27,6 +27,32 @@ export class AuditProgramService {
       createData.reviewerComment = data.reviewerComment;
     }
 
+    // Enhanced Operational Fields
+    if (data.samplingApproach !== undefined) {
+      createData.samplingApproach = data.samplingApproach;
+    }
+    if (data.sampleSize !== undefined) {
+      createData.sampleSize = data.sampleSize;
+    }
+    if (data.confidenceLevel !== undefined) {
+      createData.confidenceLevel = data.confidenceLevel;
+    }
+    if (data.materialityThreshold !== undefined) {
+      createData.materialityThreshold = data.materialityThreshold;
+    }
+    if (data.testMethod !== undefined) {
+      createData.testMethod = data.testMethod;
+    }
+    if (data.evidenceRequired !== undefined) {
+      createData.evidenceRequired = data.evidenceRequired;
+    }
+    if (data.documentationReq !== undefined) {
+      createData.documentationReq = data.documentationReq;
+    }
+    if (data.stepByStepProcedure !== undefined) {
+      createData.stepByStepProcedure = data.stepByStepProcedure;
+    }
+
     return this.prisma.auditProgram.create({
       data: createData,
     });
@@ -62,6 +88,32 @@ export class AuditProgramService {
     }
     if (data.reviewerComment !== undefined) {
       updateData.reviewerComment = data.reviewerComment;
+    }
+
+    // Enhanced Operational Fields
+    if (data.samplingApproach !== undefined) {
+      updateData.samplingApproach = data.samplingApproach;
+    }
+    if (data.sampleSize !== undefined) {
+      updateData.sampleSize = data.sampleSize;
+    }
+    if (data.confidenceLevel !== undefined) {
+      updateData.confidenceLevel = data.confidenceLevel;
+    }
+    if (data.materialityThreshold !== undefined) {
+      updateData.materialityThreshold = data.materialityThreshold;
+    }
+    if (data.testMethod !== undefined) {
+      updateData.testMethod = data.testMethod;
+    }
+    if (data.evidenceRequired !== undefined) {
+      updateData.evidenceRequired = data.evidenceRequired;
+    }
+    if (data.documentationReq !== undefined) {
+      updateData.documentationReq = data.documentationReq;
+    }
+    if (data.stepByStepProcedure !== undefined) {
+      updateData.stepByStepProcedure = data.stepByStepProcedure;
     }
 
     return this.prisma.auditProgram.update({

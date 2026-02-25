@@ -3,38 +3,38 @@ export declare class RoleController {
     private roleService;
     constructor(roleService: RoleService);
     getAll(): Promise<{
-        roleName: string;
-        description: string | null;
         id: number;
         createdAt: Date;
         updatedAt: Date;
+        roleName: string;
+        description: string | null;
     }[]>;
     getOne(id: number): Promise<{
-        roleName: string;
-        description: string | null;
         id: number;
         createdAt: Date;
         updatedAt: Date;
+        roleName: string;
+        description: string | null;
     }>;
     create(data: CreateRoleDto): Promise<{
-        roleName: string;
-        description: string | null;
         id: number;
         createdAt: Date;
         updatedAt: Date;
+        roleName: string;
+        description: string | null;
     }>;
     update(id: number, data: UpdateRoleDto): Promise<{
-        roleName: string;
-        description: string | null;
         id: number;
         createdAt: Date;
         updatedAt: Date;
+        roleName: string;
+        description: string | null;
     }>;
     delete(id: number): Promise<{
-        roleName: string;
-        description: string | null;
         id: number;
         createdAt: Date;
         updatedAt: Date;
+        roleName: string;
+        description: string | null;
     }>;
 }

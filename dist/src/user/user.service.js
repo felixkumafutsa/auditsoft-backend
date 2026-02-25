@@ -60,6 +60,7 @@ class UpdateUserDto {
     status;
     mfaEnabled;
     auditUniverseEntityIds;
+    profilePicture;
 }
 exports.UpdateUserDto = UpdateUserDto;
 __decorate([
@@ -93,6 +94,11 @@ __decorate([
     (0, class_validator_1.IsNumber)({}, { each: true }),
     __metadata("design:type", Array)
 ], UpdateUserDto.prototype, "auditUniverseEntityIds", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateUserDto.prototype, "profilePicture", void 0);
 class CreateProcessOwnerDto {
     name;
     email;
@@ -137,6 +143,7 @@ let UserService = class UserService {
                 id: true,
                 name: true,
                 email: true,
+                profilePicture: true,
                 status: true,
                 mfaEnabled: true,
                 createdAt: true,
@@ -153,6 +160,7 @@ let UserService = class UserService {
                 id: true,
                 name: true,
                 email: true,
+                profilePicture: true,
                 status: true,
                 mfaEnabled: true,
                 createdAt: true,
@@ -185,6 +193,7 @@ let UserService = class UserService {
                 name: data.name,
                 email: data.email,
                 passwordHash: passwordHash,
+                profilePicture: data.profilePicture || undefined,
                 status: data.status || 'active',
                 mfaEnabled: data.mfaEnabled || false,
                 auditUniverseOwner: data.auditUniverseEntityIds ? {
@@ -195,6 +204,7 @@ let UserService = class UserService {
                 id: true,
                 name: true,
                 email: true,
+                profilePicture: true,
                 status: true,
                 mfaEnabled: true,
                 createdAt: true,
@@ -223,6 +233,7 @@ let UserService = class UserService {
                 status: data.status,
                 mfaEnabled: data.mfaEnabled,
                 passwordHash: passwordHash,
+                profilePicture: data.profilePicture || undefined,
                 auditUniverseOwner: data.auditUniverseEntityIds ? {
                     set: data.auditUniverseEntityIds.map(id => ({ id }))
                 } : undefined,
@@ -231,6 +242,7 @@ let UserService = class UserService {
                 id: true,
                 name: true,
                 email: true,
+                profilePicture: true,
                 status: true,
                 mfaEnabled: true,
                 createdAt: true,
@@ -247,6 +259,7 @@ let UserService = class UserService {
                 id: true,
                 name: true,
                 email: true,
+                profilePicture: true,
                 status: true,
                 mfaEnabled: true,
                 createdAt: true,
@@ -450,6 +463,7 @@ let UserService = class UserService {
                 id: true,
                 name: true,
                 email: true,
+                profilePicture: true,
                 status: true,
                 mfaEnabled: true,
                 createdAt: true,

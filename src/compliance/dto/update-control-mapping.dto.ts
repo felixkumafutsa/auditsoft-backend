@@ -1,3 +1,8 @@
+import { IsOptional, IsEnum } from 'class-validator';
+import { CoverageStatus } from './create-control-mapping.dto';
+
 export class UpdateControlMappingDto {
-  coverageStatus?: string;
+  @IsOptional()
+  @IsEnum(CoverageStatus)
+  coverageStatus?: CoverageStatus | string;
 }

@@ -56,6 +56,10 @@ export class UpdateUserDto {
   @IsArray()
   @IsNumber({}, { each: true })
   auditUniverseEntityIds?: number[];
+
+  @IsOptional()
+  @IsString()
+  profilePicture?: string;
 }
 
 export class CreateProcessOwnerDto {
@@ -94,6 +98,7 @@ export class UserService {
         id: true,
         name: true,
         email: true,
+        profilePicture: true,
         status: true,
         mfaEnabled: true,
         createdAt: true,
@@ -111,6 +116,7 @@ export class UserService {
         id: true,
         name: true,
         email: true,
+        profilePicture: true,
         status: true,
         mfaEnabled: true,
         createdAt: true,
@@ -150,6 +156,7 @@ export class UserService {
         name: data.name,
         email: data.email,
         passwordHash: passwordHash,
+        profilePicture: (data as any).profilePicture || undefined,
         status: data.status || 'active',
         mfaEnabled: data.mfaEnabled || false,
         auditUniverseOwner: data.auditUniverseEntityIds ? {
@@ -160,6 +167,7 @@ export class UserService {
         id: true,
         name: true,
         email: true,
+        profilePicture: true,
         status: true,
         mfaEnabled: true,
         createdAt: true,
@@ -192,6 +200,7 @@ export class UserService {
         status: data.status,
         mfaEnabled: data.mfaEnabled,
         passwordHash: passwordHash,
+        profilePicture: (data as any).profilePicture || undefined,
         auditUniverseOwner: data.auditUniverseEntityIds ? {
           set: data.auditUniverseEntityIds.map(id => ({ id }))
         } : undefined,
@@ -200,6 +209,7 @@ export class UserService {
         id: true,
         name: true,
         email: true,
+        profilePicture: true,
         status: true,
         mfaEnabled: true,
         createdAt: true,
@@ -219,6 +229,7 @@ export class UserService {
         id: true,
         name: true,
         email: true,
+        profilePicture: true,
         status: true,
         mfaEnabled: true,
         createdAt: true,
@@ -450,6 +461,7 @@ export class UserService {
         id: true,
         name: true,
         email: true,
+        profilePicture: true,
         status: true,
         mfaEnabled: true,
         createdAt: true,

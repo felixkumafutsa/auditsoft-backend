@@ -77,4 +77,21 @@ export class ComplianceController {
   deleteControlMapping(@Param('id', ParseIntPipe) id: number) {
     return this.complianceService.deleteControlMapping(id);
   }
+
+  // --- Policies ---
+
+  @Get('policies')
+  findAllPolicies() {
+    return this.complianceService.findAllPolicies();
+  }
+
+  @Get('policies/:id')
+  findOnePolicy(@Param('id', ParseIntPipe) id: number) {
+    return this.complianceService.findOnePolicy(id);
+  }
+
+  @Delete('policies/:id')
+  deletePolicy(@Param('id', ParseIntPipe) id: number) {
+    return this.complianceService.deletePolicy(id);
+  }
 }

@@ -8,7 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { Audit } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
 import { ReportsService } from '../reports/reports.service';
-import { IsString, IsOptional, IsDate, IsNumber, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsDate, IsNumber, IsArray, IsBoolean } from 'class-validator';
 
 export class CreateAuditDto {
   @IsString()
@@ -44,6 +44,39 @@ export class CreateAuditDto {
   @IsNumber()
   @IsOptional()
   templateId?: number;
+
+  // Strategic Audit Plan Fields
+  @IsNumber()
+  @IsOptional()
+  riskScore?: number;
+
+  @IsString()
+  @IsOptional()
+  riskLevel?: string;
+
+  @IsString()
+  @IsOptional()
+  priority?: string;
+
+  @IsString()
+  @IsOptional()
+  quarter?: string;
+
+  @IsNumber()
+  @IsOptional()
+  year?: number;
+
+  @IsNumber()
+  @IsOptional()
+  resourceHours?: number;
+
+  @IsNumber()
+  @IsOptional()
+  budgetAllocation?: number;
+
+  @IsString()
+  @IsOptional()
+  justification?: string;
 }
 
 export class UpdateAuditDto {
@@ -82,6 +115,47 @@ export class UpdateAuditDto {
   @IsString()
   @IsOptional()
   chiefAuditorComments?: string;
+
+  // Strategic Audit Plan Fields
+  @IsNumber()
+  @IsOptional()
+  riskScore?: number;
+
+  @IsString()
+  @IsOptional()
+  riskLevel?: string;
+
+  @IsString()
+  @IsOptional()
+  priority?: string;
+
+  @IsString()
+  @IsOptional()
+  quarter?: string;
+
+  @IsNumber()
+  @IsOptional()
+  year?: number;
+
+  @IsNumber()
+  @IsOptional()
+  resourceHours?: number;
+
+  @IsNumber()
+  @IsOptional()
+  budgetAllocation?: number;
+
+  @IsString()
+  @IsOptional()
+  justification?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  executiveApproval?: boolean;
+
+  @IsNumber()
+  @IsOptional()
+  executiveApprovedById?: number;
 }
 
 @Injectable()
@@ -200,6 +274,15 @@ export class AuditService {
         endDate: data.endDate,
         assignedManagerId: data.assignedManagerId,
         auditUniverseId: data.auditUniverseId,
+        // Strategic Audit Plan fields
+        riskScore: data.riskScore,
+        riskLevel: data.riskLevel,
+        priority: data.priority,
+        quarter: data.quarter,
+        year: data.year,
+        resourceHours: data.resourceHours,
+        budgetAllocation: data.budgetAllocation,
+        justification: data.justification,
         assignedAuditors: data.assignedAuditorIds ? {
           connect: data.assignedAuditorIds.map(id => ({ id }))
         } : undefined,
@@ -280,8 +363,19 @@ export class AuditService {
       assignedManagerId,
       auditUniverseId,
       assignedAuditorIds,
-      chiefAuditorComments
-    } = data;
+      chiefAuditorComments,
+      // Strategic fields
+      riskScore,
+      riskLevel,
+      priority,
+      quarter,
+      year,
+      resourceHours,
+      budgetAllocation,
+      justification,
+      executiveApproval,
+      executiveApprovedById
+    } = data as any;
 
     const updateData: any = {
       ...(auditName !== undefined && { auditName }),
@@ -292,6 +386,18 @@ export class AuditService {
       ...(assignedManagerId !== undefined && { assignedManagerId }),
       ...(auditUniverseId !== undefined && { auditUniverseId }),
       ...(chiefAuditorComments !== undefined && { chiefAuditorComments }),
+
+      // Strategic fields
+      ...(riskScore !== undefined && { riskScore }),
+      ...(riskLevel !== undefined && { riskLevel }),
+      ...(priority !== undefined && { priority }),
+      ...(quarter !== undefined && { quarter }),
+      ...(year !== undefined && { year }),
+      ...(resourceHours !== undefined && { resourceHours }),
+      ...(budgetAllocation !== undefined && { budgetAllocation }),
+      ...(justification !== undefined && { justification }),
+      ...(executiveApproval !== undefined && { executiveApproval }),
+      ...(executiveApprovedById !== undefined && { executiveApprovedById }),
     };
 
     if (assignedAuditorIds) {

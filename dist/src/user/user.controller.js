@@ -15,9 +15,22 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserController = void 0;
 const common_1 = require("@nestjs/common");
 const user_service_1 = require("./user.service");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
+const path_1 = require("path");
+const uuid_1 = require("uuid");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 const roles_guard_1 = require("../common/guards/roles.guard");
 const roles_decorator_1 = require("../common/decorators/roles.decorator");
+const profileStorage = (0, multer_1.diskStorage)({
+    destination: './uploads/profile-pictures',
+    filename: (req, file, cb) => {
+        const name = file.originalname.split('.')[0];
+        const fileExt = (0, path_1.extname)(file.originalname);
+        const randomName = `${(0, uuid_1.v4)()}-${name.replace(/\s/g, '_')}${fileExt}`;
+        cb(null, randomName);
+    },
+});
 let UserController = class UserController {
     userService;
     constructor(userService) {
@@ -25,6 +38,13 @@ let UserController = class UserController {
     }
     getProfile(req) {
         return this.userService.findOne(req.user.id);
+    }
+    async updateProfile(file, data, req) {
+        const profilePictureUrl = file ? `/uploads/profile-pictures/${file.filename}` : undefined;
+        const updateData = { ...data };
+        if (profilePictureUrl)
+            updateData.profilePicture = profilePictureUrl;
+        return this.userService.update(req.user.id, updateData);
     }
     getTasks(req) {
         return this.userService.getTasks(req.user.id);
@@ -65,6 +85,26 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], UserController.prototype, "getProfile", null);
+__decorate([
+    (0, common_1.Post)('me'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('profilePicture', {
+        storage: profileStorage,
+        fileFilter: (req, file, cb) => {
+            const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+            if (!allowed.includes(file.mimetype)) {
+                return cb(new common_1.BadRequestException('Invalid file type. Only images are allowed.'), false);
+            }
+            cb(null, true);
+        },
+        limits: { fileSize: 5 * 1024 * 1024 },
+    })),
+    __param(0, (0, common_1.UploadedFile)()),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, user_service_1.UpdateUserDto, Object]),
+    __metadata("design:returntype", Promise)
+], UserController.prototype, "updateProfile", null);
 __decorate([
     (0, common_1.Get)('me/tasks'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),

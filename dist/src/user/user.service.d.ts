@@ -15,6 +15,7 @@ export declare class UpdateUserDto {
     status?: string;
     mfaEnabled?: boolean;
     auditUniverseEntityIds?: number[];
+    profilePicture?: string;
 }
 export declare class CreateProcessOwnerDto {
     name: string;

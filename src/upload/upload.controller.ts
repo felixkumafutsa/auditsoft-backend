@@ -1,10 +1,12 @@
-import { Controller, Post, UseInterceptors, UploadedFile, Body, BadRequestException, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, UseInterceptors, UploadedFile, Body, BadRequestException, UseGuards, Req, Delete, Query, NotFoundException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PrismaService } from '../../prisma/prisma.service';
+import { promises as fs } from 'fs';
+import { join, basename } from 'path';
 
 interface UploadedFileWithMetadata {
   fieldname: string;
@@ -37,8 +39,10 @@ export class UploadController {
   async uploadPolicyDocument(
     @UploadedFile() file: UploadedFileWithMetadata,
     @Req() req: any,
-    @Body('frameworkId') frameworkId?: number,
+    @Body('frameworkId') frameworkId?: any,
     @Body('description') description?: string,
+    @Body('version') version?: string,
+    @Body('policyName') policyName?: string,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
@@ -61,22 +65,34 @@ export class UploadController {
       throw new BadRequestException('File too large. Maximum size is 10MB.');
     }
 
-    // Store file record in database if frameworkId is provided
-    // TODO: Add database storage once PolicyDocument model is created
-    let fileRecord = null;
-    if (frameworkId) {
-      // fileRecord = await this.prisma.policyDocument.create({
-      //   data: {
-      //     frameworkId,
-      //     fileName: file.originalname,
-      //     fileType: file.mimetype,
-      //     fileHash: `hash_${Date.now()}`, // Generate proper hash in production
-      //     uploadedById: req.user?.id || 1,
-      //     description,
-      //     filePath: `/uploads/policy-documents/${file.filename}`,
-      //   },
-      // });
-      // File uploaded successfully
+    // Create a Policy record in the database
+    const uploaderId = req.user?.id || 1;
+    const policyData = {
+      policyName: (policyName || file.originalname),
+      version: version || '1.0',
+      description: description || null,
+      fileUrl: `/uploads/policy-documents/${file.filename}`,
+      status: 'Draft',
+      effectiveDate: new Date(),
+    };
+
+    const createdPolicy = await this.prisma.policy.create({
+      data: policyData as any,
+    });
+
+    // If frameworkId provided, create a mapping
+    const frameworkIdNum = frameworkId ? Number(frameworkId) : undefined;
+    if (frameworkIdNum) {
+      try {
+        await this.prisma.policyMapping.create({
+          data: {
+            policyId: createdPolicy.id,
+            frameworkId: frameworkIdNum,
+          },
+        });
+      } catch (err) {
+        // ignore mapping errors for now (e.g., unique constraint)
+      }
     }
 
     return {
@@ -86,7 +102,33 @@ export class UploadController {
       size: file.size,
       mimetype: file.mimetype,
       url: `/uploads/policy-documents/${file.filename}`,
-      fileRecord,
+      policy: createdPolicy,
     };
+  }
+
+  @Delete('policy-document')
+  async deletePolicyDocument(
+    @Query('filename') filename?: string,
+  ) {
+    if (!filename) {
+      throw new BadRequestException('filename is required');
+    }
+
+    const safeName = basename(filename);
+    const filePath = join(process.cwd(), 'uploads', 'policy-documents', safeName);
+
+    try {
+      await fs.stat(filePath);
+    } catch (err) {
+      throw new NotFoundException('File not found');
+    }
+
+    try {
+      await fs.unlink(filePath);
+    } catch (err) {
+      throw new BadRequestException('Failed to delete file');
+    }
+
+    return { message: 'File deleted successfully', filename: safeName };
   }
 }

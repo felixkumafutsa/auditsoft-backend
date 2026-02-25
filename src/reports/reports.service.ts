@@ -331,7 +331,11 @@ export class ReportsService {
       include: {
         assignedManager: true,
         assignedAuditors: true,
-        auditUniverse: true,
+        auditUniverse: {
+          include: {
+            owner: true
+          }
+        },
         auditPrograms: {
           include: {
             findings: {
@@ -341,6 +345,17 @@ export class ReportsService {
                     owner: true
                   }
                 }
+              }
+            },
+            evidence: {
+              include: {
+                uploadedBy: true,
+                versions: true
+              }
+            },
+            controlMappings: {
+              include: {
+                framework: true
               }
             }
           }
@@ -375,6 +390,12 @@ export class ReportsService {
     doc.fontSize(12).text(`Status: ${audit.status}`);
     doc.text(`Type: ${audit.auditType}`);
     doc.text(`Business Entity: ${audit.auditUniverse?.entityName || 'N/A'} (${audit.auditUniverse?.entityType || 'N/A'})`);
+    if (audit.auditUniverse?.owner) {
+      doc.text(`Entity Owner: ${audit.auditUniverse.owner?.name || 'N/A'} (${audit.auditUniverse.owner?.email || 'N/A'})`);
+    }
+    if ((audit.auditUniverse as any)?.riskRating) {
+      doc.text(`Entity Risk Rating: ${(audit.auditUniverse as any).riskRating}`);
+    }
     doc.text(`Audit Manager: ${audit.assignedManager?.name || 'Unassigned'}`);
 
     const auditors = audit.assignedAuditors?.map(a => a.name).join(', ') || 'Unassigned';
@@ -391,6 +412,27 @@ export class ReportsService {
         doc.fontSize(10).text(`   Control Reference: ${program.controlReference || 'N/A'}`);
         doc.text(`   Expected Outcome: ${program.expectedOutcome || 'N/A'}`);
         doc.text(`   Actual Result: ${program.actualResult || 'In Progress'}`);
+
+        // Control Mappings for this program
+        if (program.controlMappings && program.controlMappings.length > 0) {
+          doc.fontSize(10).text('   Control Mappings:');
+          program.controlMappings.forEach((mapping: any) => {
+            const fwName = mapping.framework?.frameworkName || 'Unnamed Framework';
+            doc.fontSize(10).text(`     - ${fwName} : ${mapping.coverageStatus}`);
+          });
+        } else {
+          doc.fontSize(10).text('   Control Mappings: None');
+        }
+
+        // Evidence summary for program
+        const evidenceCount = program.evidence?.length || 0;
+        doc.fontSize(10).text(`   Evidence Files: ${evidenceCount}`);
+        if (evidenceCount > 0) {
+          program.evidence.forEach((ev: any, ei: number) => {
+            doc.fontSize(9).text(`     ${ei + 1}. ${ev.fileName} (Uploaded by: ${ev.uploadedBy?.name || 'Unknown'})`);
+          });
+        }
+
         doc.moveDown(0.5);
       });
     } else {

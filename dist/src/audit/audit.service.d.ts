@@ -12,6 +12,14 @@ export declare class CreateAuditDto {
     auditUniverseId?: number;
     assignedAuditorIds?: number[];
     templateId?: number;
+    riskScore?: number;
+    riskLevel?: string;
+    priority?: string;
+    quarter?: string;
+    year?: number;
+    resourceHours?: number;
+    budgetAllocation?: number;
+    justification?: string;
 }
 export declare class UpdateAuditDto {
     auditName?: string;
@@ -23,6 +31,16 @@ export declare class UpdateAuditDto {
     auditUniverseId?: number;
     assignedAuditorIds?: number[];
     chiefAuditorComments?: string;
+    riskScore?: number;
+    riskLevel?: string;
+    priority?: string;
+    quarter?: string;
+    year?: number;
+    resourceHours?: number;
+    budgetAllocation?: number;
+    justification?: string;
+    executiveApproval?: boolean;
+    executiveApprovedById?: number;
 }
 export declare class AuditService {
     private prisma;
