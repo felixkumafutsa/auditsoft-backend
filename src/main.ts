@@ -32,7 +32,7 @@ async function bootstrap() {
   });
 
   // ─── 1.5. Serve static files (uploads) ──────────────────────────────────
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads',
   });
 
