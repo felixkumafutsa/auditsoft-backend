@@ -5,14 +5,14 @@ export declare class AuditController {
     private workflowService;
     constructor(auditService: AuditService, workflowService: AuditWorkflowService);
     getAll(req: any): Promise<{
-        id: number;
         status: string;
+        auditUniverseId: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
-        auditUniverseId: number | null;
         endDate: Date | null;
         startDate: Date | null;
         chiefAuditorComments: string | null;
@@ -29,14 +29,14 @@ export declare class AuditController {
         year: number | null;
     }[]>;
     getForOwner(req: any): Promise<{
-        id: number;
         status: string;
+        auditUniverseId: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
-        auditUniverseId: number | null;
         endDate: Date | null;
         startDate: Date | null;
         chiefAuditorComments: string | null;
@@ -53,14 +53,14 @@ export declare class AuditController {
         year: number | null;
     }[]>;
     getTemplates(): Promise<{
-        id: number;
         status: string;
+        auditUniverseId: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
-        auditUniverseId: number | null;
         endDate: Date | null;
         startDate: Date | null;
         chiefAuditorComments: string | null;
@@ -77,14 +77,14 @@ export declare class AuditController {
         year: number | null;
     }[]>;
     getOne(id: number, req: any): Promise<{
-        id: number;
         status: string;
+        auditUniverseId: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
-        auditUniverseId: number | null;
         endDate: Date | null;
         startDate: Date | null;
         chiefAuditorComments: string | null;
@@ -101,14 +101,14 @@ export declare class AuditController {
         year: number | null;
     }>;
     create(body: CreateAuditDto): Promise<{
-        id: number;
         status: string;
+        auditUniverseId: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
-        auditUniverseId: number | null;
         endDate: Date | null;
         startDate: Date | null;
         chiefAuditorComments: string | null;
@@ -125,14 +125,14 @@ export declare class AuditController {
         year: number | null;
     }>;
     update(id: number, body: UpdateAuditDto, req: any): Promise<{
-        id: number;
         status: string;
+        auditUniverseId: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
-        auditUniverseId: number | null;
         endDate: Date | null;
         startDate: Date | null;
         chiefAuditorComments: string | null;
@@ -151,14 +151,14 @@ export declare class AuditController {
     assignAuditors(id: number, body: {
         auditorIds: number[];
     }): Promise<{
-        id: number;
         status: string;
+        auditUniverseId: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
-        auditUniverseId: number | null;
         endDate: Date | null;
         startDate: Date | null;
         chiefAuditorComments: string | null;
@@ -175,14 +175,14 @@ export declare class AuditController {
         year: number | null;
     }>;
     delete(id: number): Promise<{
-        id: number;
         status: string;
+        auditUniverseId: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
-        auditUniverseId: number | null;
         endDate: Date | null;
         startDate: Date | null;
         chiefAuditorComments: string | null;
@@ -204,14 +204,14 @@ export declare class AuditController {
         toStatus: string;
         userRole?: string;
     }, req: any): Promise<{
-        id: number;
         status: string;
+        auditUniverseId: number | null;
+        id: number;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
         auditName: string;
         auditType: string;
-        auditUniverseId: number | null;
         endDate: Date | null;
         startDate: Date | null;
         chiefAuditorComments: string | null;
