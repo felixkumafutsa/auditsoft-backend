@@ -14,17 +14,19 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // ─── 1. CORS: Restrict to known front-end origin ──────────────────────────
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001')
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001,https://mw265.com,https://api.mw265.com')
     .split(',')
     .map(o => o.trim());
 
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests with no origin (e.g. mobile apps, curl) or matched origins
+      if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
         callback(null, true);
       } else {
-        callback(new Error(`CORS: Origin ${origin} not allowed`));
+        // Log the mismatch instead of throwing an unhandled error
+        console.warn(`[CORS] Rejected origin: ${origin}`);
+        callback(null, false);
       }
     },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',

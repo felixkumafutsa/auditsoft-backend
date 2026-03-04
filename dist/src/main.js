@@ -44,16 +44,17 @@ const path_1 = require("path");
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     app.setGlobalPrefix('api');
-    const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001')
+    const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001,https://mw265.com,https://api.mw265.com')
         .split(',')
         .map(o => o.trim());
     app.enableCors({
         origin: (origin, callback) => {
-            if (!origin || allowedOrigins.includes(origin)) {
+            if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
                 callback(null, true);
             }
             else {
-                callback(new Error(`CORS: Origin ${origin} not allowed`));
+                console.warn(`[CORS] Rejected origin: ${origin}`);
+                callback(null, false);
             }
         },
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',

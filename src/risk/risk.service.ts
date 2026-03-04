@@ -12,7 +12,7 @@ export class RiskService {
   // Helper for scoring
   private calculateScore(impact: string, likelihood: string): number {
     const impacts = { 'Low': 1, 'Medium': 2, 'High': 3, 'Critical': 4 };
-    const likelihoods = { 'Low': 1, 'Medium': 2, 'High': 3 };
+    const likelihoods = { 'Rare': 1, 'Unlikely': 2, 'Possible': 3, 'Likely': 4, 'Certain': 5 };
 
     const i = impacts[impact] || 0;
     const l = likelihoods[likelihood] || 0;
