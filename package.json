@@ -38,6 +38,7 @@
     "@nestjs/swagger": "^11.2.6",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.1.13",
+    "@prisma/client": "^6.19.2",
     "@types/multer": "^2.0.0",
     "@types/uuid": "^10.0.0",
     "bcrypt": "^6.0.0",
@@ -45,6 +46,7 @@
     "class-validator": "^0.14.3",
     "docx": "^9.5.1",
     "dotenv": "^17.2.3",
+    "exceljs": "^4.4.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pdfkit": "^0.17.2",
@@ -53,8 +55,7 @@
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.3",
     "swagger-ui-express": "^5.0.1",
-    "uuid": "^13.0.0",
-    "@prisma/client": "^6.19.2"
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

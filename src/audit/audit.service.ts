@@ -3,7 +3,9 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  StreamableFile,
 } from '@nestjs/common';
+import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Audit } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
@@ -192,7 +194,11 @@ export class AuditService {
       where,
       include: {
         findings: true,
-        auditPrograms: true,
+        auditPrograms: {
+          include: {
+            workpaper: true
+          }
+        },
         assignedManager: true,
         assignedAuditors: true,
         auditUniverse: true
@@ -201,12 +207,87 @@ export class AuditService {
     });
   }
 
+  async exportExcel(user?: any): Promise<StreamableFile> {
+    const audits = await this.findAll(user);
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Audits');
+
+    // Define columns
+    worksheet.columns = [
+      { header: 'ID', key: 'id', width: 10 },
+      { header: 'Audit Name', key: 'auditName', width: 40 },
+      { header: 'Type', key: 'auditType', width: 25 },
+      { header: 'Status', key: 'status', width: 20 },
+      { header: 'Start Date', key: 'startDate', width: 20 },
+      { header: 'End Date', key: 'endDate', width: 20 },
+      { header: 'Risk Level', key: 'riskLevel', width: 15 },
+      { header: 'Assigned Manager', key: 'manager', width: 25 },
+    ];
+
+    // Style headers
+    worksheet.getRow(1).font = { bold: true };
+
+    // Add rows
+    audits.forEach((audit) => {
+      worksheet.addRow({
+        id: audit.id,
+        auditName: audit.auditName,
+        auditType: audit.auditType,
+        status: audit.status,
+        startDate: audit.startDate ? new Date(audit.startDate).toLocaleDateString() : 'N/A',
+        endDate: audit.endDate ? new Date(audit.endDate).toLocaleDateString() : 'N/A',
+        riskLevel: audit.riskLevel || 'N/A',
+        manager: (audit as any).assignedManager?.name || 'Unassigned',
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return new StreamableFile(Buffer.from(buffer));
+  }
+
+  async findAllLightweight(user?: any): Promise<Partial<Audit>[]> {
+    const where: any = {
+      status: { not: 'Template' }
+    };
+
+    if (user) {
+      const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
+      const isAuditor = roles.includes('Auditor');
+      const isProcessOwner = roles.some(r => r.toLowerCase().includes('process owner'));
+      const isAdminOrManager = roles.some(r => ['System Administrator', 'Audit Manager', 'CAE', 'Chief Auditor'].includes(r));
+
+      if (!isAdminOrManager) {
+        if (isAuditor) {
+          where.assignedAuditors = { some: { id: user.id } };
+        } else if (isProcessOwner) {
+          where.auditUniverse = { ownerId: user.id };
+        }
+      }
+    }
+
+    return this.prisma.audit.findMany({
+      where,
+      select: {
+        id: true,
+        auditName: true,
+        status: true,
+        auditType: true
+      },
+      orderBy: { auditName: 'asc' }
+    });
+  }
+
   async findOne(id: number, user?: any): Promise<Audit> {
     const audit = await this.prisma.audit.findUnique({
       where: { id },
       include: {
         findings: true,
-        auditPrograms: true,
+        auditPrograms: {
+          include: {
+            workpaper: true
+          }
+        },
         assignedManager: true,
         assignedAuditors: true,
         auditUniverse: true

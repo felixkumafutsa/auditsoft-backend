@@ -1,3 +1,4 @@
+import { StreamableFile } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Audit } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
@@ -48,6 +49,8 @@ export declare class AuditService {
     private reportsService;
     constructor(prisma: PrismaService, notificationService: NotificationService, reportsService: ReportsService);
     findAll(user?: any): Promise<Audit[]>;
+    exportExcel(user?: any): Promise<StreamableFile>;
+    findAllLightweight(user?: any): Promise<Partial<Audit>[]>;
     findOne(id: number, user?: any): Promise<Audit>;
     findTemplates(): Promise<Audit[]>;
     findForOwner(ownerId: number): Promise<Audit[]>;

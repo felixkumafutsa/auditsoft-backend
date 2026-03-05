@@ -12,7 +12,10 @@ import {
   UseGuards,
   Req,
   HttpCode,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuditService, CreateAuditDto, UpdateAuditDto } from './audit.service';
 import { AuditWorkflowService } from '../workflow/audit.workflow';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -31,6 +34,22 @@ export class AuditController {
   @Get()
   getAll(@Req() req: any) {
     return this.auditService.findAll(req.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('export/excel')
+  async exportExcel(@Req() req: any, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="audits.xlsx"',
+    });
+    return this.auditService.exportExcel(req.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('lightweight')
+  getLightweight(@Req() req: any) {
+    return this.auditService.findAllLightweight(req.user);
   }
 
   @UseGuards(JwtAuthGuard)

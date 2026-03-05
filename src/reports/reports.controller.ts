@@ -41,13 +41,13 @@ export class ReportsController {
   }
 
   @Get('audit/:id/pdf')
-  @Roles('Chief Auditor', 'System Administrator')
+  @Roles('Chief Auditor', 'System Administrator', 'Audit Manager')
   async downloadAuditReportPDF(@Param('id') id: string, @Res() res: express.Response) {
     return this.reportsService.generatePDF(+id, res);
   }
 
   @Get('audit/:id/docx')
-  @Roles('Chief Auditor', 'System Administrator')
+  @Roles('Chief Auditor', 'System Administrator', 'Audit Manager')
   async downloadAuditReportWord(@Param('id') id: string, @Res() res: express.Response) {
     return this.reportsService.generateWord(+id, res);
   }
@@ -59,9 +59,23 @@ export class ReportsController {
   }
 
   @Get('audit/:id/file')
-  @Roles('Chief Auditor', 'System Administrator')
+  @Roles('Chief Auditor', 'System Administrator', 'Audit Manager')
   async downloadStoredAuditReport(@Param('id') id: string, @Res() res: express.Response) {
     return this.reportsService.streamStoredPDF(+id, res, true);
+  }
+
+  @Post('custom/save')
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager')
+  async saveCustomReport(@Body() data: any) {
+    // Mock save: Prisma schema doesn't have a SavedReport table yet
+    return { success: true, message: 'Report template saved successfully (mock)' };
+  }
+
+  @Get('saved')
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager')
+  async getSavedReports() {
+    // Mock endpoint
+    return [];
   }
 
   @Post('audit/:id/save')

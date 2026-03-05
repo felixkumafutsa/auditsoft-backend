@@ -1,3 +1,5 @@
+import { StreamableFile } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuditService, CreateAuditDto, UpdateAuditDto } from './audit.service';
 import { AuditWorkflowService } from '../workflow/audit.workflow';
 export declare class AuditController {
@@ -28,6 +30,31 @@ export declare class AuditController {
         riskScore: number | null;
         year: number | null;
     }[]>;
+    exportExcel(req: any, res: Response): Promise<StreamableFile>;
+    getLightweight(req: any): Promise<Partial<{
+        status: string;
+        auditUniverseId: number | null;
+        id: number;
+        createdAt: Date;
+        updatedAt: Date;
+        assignedManagerId: number | null;
+        auditName: string;
+        auditType: string;
+        endDate: Date | null;
+        startDate: Date | null;
+        chiefAuditorComments: string | null;
+        budgetAllocation: number | null;
+        executiveApproval: boolean;
+        executiveApprovedAt: Date | null;
+        executiveApprovedById: number | null;
+        justification: string | null;
+        priority: string | null;
+        quarter: string | null;
+        resourceHours: number | null;
+        riskLevel: string | null;
+        riskScore: number | null;
+        year: number | null;
+    }>[]>;
     getForOwner(req: any): Promise<{
         status: string;
         auditUniverseId: number | null;

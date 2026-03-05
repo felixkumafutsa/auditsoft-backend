@@ -1,16 +1,50 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuditService = exports.UpdateAuditDto = exports.CreateAuditDto = void 0;
 const common_1 = require("@nestjs/common");
+const ExcelJS = __importStar(require("exceljs"));
 const prisma_service_1 = require("../../prisma/prisma.service");
 const notification_service_1 = require("../notification/notification.service");
 const reports_service_1 = require("../reports/reports.service");
@@ -266,7 +300,11 @@ let AuditService = class AuditService {
             where,
             include: {
                 findings: true,
-                auditPrograms: true,
+                auditPrograms: {
+                    include: {
+                        workpaper: true
+                    }
+                },
                 assignedManager: true,
                 assignedAuditors: true,
                 auditUniverse: true
@@ -274,12 +312,75 @@ let AuditService = class AuditService {
             orderBy: { createdAt: 'desc' }
         });
     }
+    async exportExcel(user) {
+        const audits = await this.findAll(user);
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Audits');
+        worksheet.columns = [
+            { header: 'ID', key: 'id', width: 10 },
+            { header: 'Audit Name', key: 'auditName', width: 40 },
+            { header: 'Type', key: 'auditType', width: 25 },
+            { header: 'Status', key: 'status', width: 20 },
+            { header: 'Start Date', key: 'startDate', width: 20 },
+            { header: 'End Date', key: 'endDate', width: 20 },
+            { header: 'Risk Level', key: 'riskLevel', width: 15 },
+            { header: 'Assigned Manager', key: 'manager', width: 25 },
+        ];
+        worksheet.getRow(1).font = { bold: true };
+        audits.forEach((audit) => {
+            worksheet.addRow({
+                id: audit.id,
+                auditName: audit.auditName,
+                auditType: audit.auditType,
+                status: audit.status,
+                startDate: audit.startDate ? new Date(audit.startDate).toLocaleDateString() : 'N/A',
+                endDate: audit.endDate ? new Date(audit.endDate).toLocaleDateString() : 'N/A',
+                riskLevel: audit.riskLevel || 'N/A',
+                manager: audit.assignedManager?.name || 'Unassigned',
+            });
+        });
+        const buffer = await workbook.xlsx.writeBuffer();
+        return new common_1.StreamableFile(Buffer.from(buffer));
+    }
+    async findAllLightweight(user) {
+        const where = {
+            status: { not: 'Template' }
+        };
+        if (user) {
+            const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
+            const isAuditor = roles.includes('Auditor');
+            const isProcessOwner = roles.some(r => r.toLowerCase().includes('process owner'));
+            const isAdminOrManager = roles.some(r => ['System Administrator', 'Audit Manager', 'CAE', 'Chief Auditor'].includes(r));
+            if (!isAdminOrManager) {
+                if (isAuditor) {
+                    where.assignedAuditors = { some: { id: user.id } };
+                }
+                else if (isProcessOwner) {
+                    where.auditUniverse = { ownerId: user.id };
+                }
+            }
+        }
+        return this.prisma.audit.findMany({
+            where,
+            select: {
+                id: true,
+                auditName: true,
+                status: true,
+                auditType: true
+            },
+            orderBy: { auditName: 'asc' }
+        });
+    }
     async findOne(id, user) {
         const audit = await this.prisma.audit.findUnique({
             where: { id },
             include: {
                 findings: true,
-                auditPrograms: true,
+                auditPrograms: {
+                    include: {
+                        workpaper: true
+                    }
+                },
                 assignedManager: true,
                 assignedAuditors: true,
                 auditUniverse: true

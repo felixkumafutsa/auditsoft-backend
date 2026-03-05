@@ -7,13 +7,43 @@ import { NotificationService } from '../notification/notification.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { IsArray, IsString, IsOptional, ValidateNested, IsIn } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class DateRangeDto {
+  @IsString()
+  start: Date;
+  @IsString()
+  end: Date;
+}
+
+class CustomReportFiltersDto {
+  @IsOptional()
+  @IsString()
+  auditType?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DateRangeDto)
+  dateRange?: DateRangeDto;
+}
+
 export class GenerateCustomReportDto {
+  @IsArray()
+  @IsString({ each: true })
   fields: string[]; // ['auditName', 'status', 'assignedManager', ...]
-  filters: {
-    auditType?: string;
-    status?: string;
-    dateRange?: { start: Date; end: Date };
-  };
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CustomReportFiltersDto)
+  filters?: CustomReportFiltersDto;
+
+  @IsString()
+  @IsIn(['pdf', 'csv'])
   format: 'pdf' | 'csv';
 }
 
@@ -111,6 +141,8 @@ export class ReportsService {
       if (currentY > 550) {
         doc.addPage({ layout: 'landscape', margin: 30 });
         currentY = 50;
+        // Draw footer on new page
+        this.drawFooter(doc, 'AUDITSOFT — Internal Audit Management System');
       }
 
       fields.forEach((field, i) => {
@@ -121,7 +153,18 @@ export class ReportsService {
       currentY += 20; // Row height
     }
 
-    doc.end();
+    // Wait for the PDF to finish generating before ending the response
+    return new Promise<void>((resolve, reject) => {
+      doc.on('end', () => {
+        resolve();
+      });
+      
+      doc.on('error', (error) => {
+        reject(error);
+      });
+
+      doc.end();
+    });
   }
 
   private getFieldLabel(field: string): string {
@@ -380,227 +423,450 @@ export class ReportsService {
     return audit;
   }
 
-  private async buildPDF(doc: PDFKit.PDFDocument, audit: any) {
-    // Title
-    doc.fontSize(20).text(`Audit Report: ${audit.auditName}`, { align: 'center' });
-    doc.moveDown();
+  /**
+   * Helper to draw a heading (bold + underlined) in the PDF
+   */
+  private drawHeading(doc: PDFKit.PDFDocument, text: string, fontSize = 14) {
+    doc.font('Helvetica-Bold').fontSize(fontSize).text(text, { underline: true });
+    doc.font('Helvetica');
+  }
 
-    // Metadata
-    doc.fontSize(14).text('General Information', { underline: true });
-    doc.fontSize(12).text(`Status: ${audit.status}`);
-    doc.text(`Type: ${audit.auditType}`);
+  /**
+   * Draw the system footer on the current page
+   */
+  private drawFooter(doc: PDFKit.PDFDocument, systemName: string) {
+    const pageHeight = doc.page.height;
+    const pageWidth = doc.page.width;
+    const margin = doc.page.margins.left;
+    const bottomMargin = 50; // Consistent bottom margin
+
+    doc.save();
+    doc
+      .fontSize(8)
+      .font('Helvetica')
+      .fillColor('#555555')
+      .text(
+        systemName,
+        margin,
+        pageHeight - bottomMargin,
+        { width: pageWidth - margin * 2, align: 'center', lineBreak: false }
+      );
+    doc.restore();
+  }
+
+  private async buildPDF(doc: PDFKit.PDFDocument, audit: any) {
+    const SYSTEM_NAME = 'AUDITSOFT — Internal Audit Management System';
+    const MARGIN = doc.page.margins.left;
+    const PAGE_WIDTH = doc.page.width;
+    const PAGE_HEIGHT = doc.page.height;
+
+    // ──────────────────────────────────────────────────────────────
+    // COVER PAGE
+    // ──────────────────────────────────────────────────────────────
+    const logoPath = path.join(__dirname, '..', '..', '..', '..', 'auditsoft-frontend', 'public', 'logo.png');
+    const coverCenterY = PAGE_HEIGHT / 2;
+
+    // Logo - positioned higher to avoid overlap
+    if (fs.existsSync(logoPath)) {
+      const logoWidth = 100;
+      const logoY = coverCenterY - 180;
+      doc.image(logoPath, (PAGE_WIDTH - logoWidth) / 2, logoY, {
+        width: logoWidth,
+      });
+    }
+
+    // Report title - positioned lower to avoid logo overlap
+    const titleY = coverCenterY - 40;
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(28)
+      .fillColor('#0F1A2B')
+      .text('AUDIT REPORT', MARGIN, titleY, { align: 'center', width: PAGE_WIDTH - MARGIN * 2 });
+
+    // Audit name
+    doc
+      .font('Helvetica')
+      .fontSize(18)
+      .fillColor('#334155')
+      .text(audit.auditName, MARGIN, titleY + 45, { align: 'center', width: PAGE_WIDTH - MARGIN * 2 });
+
+    // Generated date
+    doc
+      .font('Helvetica')
+      .fontSize(12)
+      .fillColor('#64748b')
+      .text(`Generated: ${new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })}`, MARGIN, titleY + 80, { align: 'center', width: PAGE_WIDTH - MARGIN * 2 });
+
+    // Horizontal rule
+    doc
+      .moveTo(MARGIN, titleY + 110)
+      .lineTo(PAGE_WIDTH - MARGIN, titleY + 110)
+      .lineWidth(1)
+      .strokeColor('#cbd5e1')
+      .stroke();
+
+    // Cover page footer – system name
+    doc.fillColor('#000000');
+    this.drawFooter(doc, SYSTEM_NAME);
+
+    // ──────────────────────────────────────────────────────────────
+    // PAGE 2 onward – reset colour and font for body text
+    // ──────────────────────────────────────────────────────────────
+    doc.addPage();
+    doc.fillColor('#000000').font('Helvetica');
+
+    // Draw footer on the first body page (page 2) that was just added
+    this.drawFooter(doc, SYSTEM_NAME);
+
+    // Track current Y position and manage pagination properly
+    let currentY = doc.y;
+
+    // Helper function to check if we need a new page
+    const checkPageBreak = (requiredHeight: number) => {
+      if (currentY + requiredHeight > PAGE_HEIGHT - 80) {
+        doc.addPage();
+        currentY = doc.y;
+        this.drawFooter(doc, SYSTEM_NAME);
+        return true;
+      }
+      return false;
+    };
+
+    // ──────────────────────────────────────────────────────────────
+    // SECTION 1 – EXECUTIVE SUMMARY  (first section after cover)
+    // ──────────────────────────────────────────────────────────────
+    const actionPlansSummaryForExec = audit.findings?.flatMap(f => f.actionPlans || []) || [];
+    let totalEvidenceForExec = 0;
+    audit.auditPrograms?.forEach(program => { totalEvidenceForExec += program.evidence?.length || 0; });
+
+    checkPageBreak(100);
+    this.drawHeading(doc, '1. Executive Summary');
+    currentY = doc.y + 10;
+    doc.fontSize(12);
+    doc.text(`Audit:              ${audit.auditName}`);
+    currentY = doc.y + 5;
+    doc.text(`Status:             ${audit.status}`);
+    currentY = doc.y + 5;
+    doc.text(`Audit Period:       ${audit.startDate ? new Date(audit.startDate).toDateString() : 'N/A'} — ${audit.endDate ? new Date(audit.endDate).toDateString() : 'N/A'}`);
+    currentY = doc.y + 5;
+    doc.text(`Audit Manager:      ${audit.assignedManager?.name || 'Unassigned'}`);
+    currentY = doc.y + 5;
+    doc.text(`Assigned Auditor(s): ${audit.assignedAuditors?.map(a => a.name).join(', ') || 'Unassigned'}`);
+    currentY = doc.y + 10;
+    doc.text(`Programs Completed: ${audit.auditPrograms?.filter(p => p.actualResult === 'Completed').length || 0} of ${audit.auditPrograms?.length || 0}`);
+    currentY = doc.y + 5;
+    doc.text(`Findings Identified: ${audit.findings?.length || 0} total findings`);
+    currentY = doc.y + 5;
+    doc.text(`Action Plans Required: ${actionPlansSummaryForExec.length} remediation items`);
+    currentY = doc.y + 5;
+    doc.text(`Evidence Collected:  ${totalEvidenceForExec} evidence files`);
+    currentY = doc.y + 15;
+
+    // ──────────────────────────────────────────────────────────────
+    // SECTION 2 – GENERAL INFORMATION
+    // ──────────────────────────────────────────────────────────────
+    checkPageBreak(80);
+    this.drawHeading(doc, '2. General Information');
+    currentY = doc.y + 10;
+    doc.fontSize(12);
+    doc.text(`Audit Type:      ${audit.auditType}`);
+    currentY = doc.y + 5;
     doc.text(`Business Entity: ${audit.auditUniverse?.entityName || 'N/A'} (${audit.auditUniverse?.entityType || 'N/A'})`);
+    currentY = doc.y + 5;
     if (audit.auditUniverse?.owner) {
-      doc.text(`Entity Owner: ${audit.auditUniverse.owner?.name || 'N/A'} (${audit.auditUniverse.owner?.email || 'N/A'})`);
+      doc.text(`Entity Owner:    ${audit.auditUniverse.owner?.name || 'N/A'} (${audit.auditUniverse.owner?.email || 'N/A'})`);
+      currentY = doc.y + 5;
     }
     if ((audit.auditUniverse as any)?.riskRating) {
       doc.text(`Entity Risk Rating: ${(audit.auditUniverse as any).riskRating}`);
+      currentY = doc.y + 5;
     }
-    doc.text(`Audit Manager: ${audit.assignedManager?.name || 'Unassigned'}`);
+    if (audit.chiefAuditorComments) {
+      currentY = doc.y + 5;
+      doc.font('Helvetica-Bold').text('Chief Auditor Comments:');
+      currentY = doc.y + 5;
+      doc.font('Helvetica').text(audit.chiefAuditorComments);
+      currentY = doc.y + 10;
+    }
 
-    const auditors = audit.assignedAuditors?.map(a => a.name).join(', ') || 'Unassigned';
-    doc.text(`Assigned Auditor(s): ${auditors}`);
-
-    doc.text(`Dates: ${audit.startDate ? new Date(audit.startDate).toDateString() : 'N/A'} - ${audit.endDate ? new Date(audit.endDate).toDateString() : 'N/A'}`);
-    doc.moveDown();
-
-    // Audit Programs
-    doc.fontSize(14).text('Audit Programs', { underline: true });
+    // ──────────────────────────────────────────────────────────────
+    // SECTION 3 – AUDIT PROGRAMS & REVIEWER COMMENTS
+    // ──────────────────────────────────────────────────────────────
+    checkPageBreak(100);
+    this.drawHeading(doc, '3. Audit Programs');
+    currentY = doc.y + 10;
     if (audit.auditPrograms && audit.auditPrograms.length > 0) {
       audit.auditPrograms.forEach((program, index) => {
-        doc.fontSize(12).text(`${index + 1}. ${program.procedureName}`);
-        doc.fontSize(10).text(`   Control Reference: ${program.controlReference || 'N/A'}`);
-        doc.text(`   Expected Outcome: ${program.expectedOutcome || 'N/A'}`);
-        doc.text(`   Actual Result: ${program.actualResult || 'In Progress'}`);
+        checkPageBreak(80);
+        // Sub-heading for each program (bold, underlined via Helvetica-Bold + underline)
+        doc.font('Helvetica-Bold').fontSize(12).text(`${index + 1}. ${program.procedureName}`, { underline: true });
+        currentY = doc.y + 5;
+        doc.font('Helvetica').fontSize(10);
 
-        // Control Mappings for this program
+        doc.text(`   Control Reference:     ${program.controlReference || 'N/A'}`);
+        currentY = doc.y + 3;
+        doc.text(`   Expected Outcome:      ${program.expectedOutcome || 'N/A'}`);
+        currentY = doc.y + 3;
+        doc.text(`   Actual Result:         ${program.actualResult || 'In Progress'}`);
+        currentY = doc.y + 5;
+
+        // Reviewer comment
+        if (program.reviewerComment) {
+          doc.font('Helvetica-Bold').text('   Reviewer Comment:', { continued: false });
+          doc.font('Helvetica').fillColor('#1e3a5f').text(`   "${program.reviewerComment}"`).fillColor('#000000');
+          currentY = doc.y + 5;
+        }
+
+        // Control Mappings
         if (program.controlMappings && program.controlMappings.length > 0) {
-          doc.fontSize(10).text('   Control Mappings:');
+          doc.font('Helvetica-Bold').text('   Control Mappings:');
+          currentY = doc.y + 3;
+          doc.font('Helvetica');
           program.controlMappings.forEach((mapping: any) => {
             const fwName = mapping.framework?.frameworkName || 'Unnamed Framework';
-            doc.fontSize(10).text(`     - ${fwName} : ${mapping.coverageStatus}`);
+            doc.text(`     - ${fwName} : ${mapping.coverageStatus}`);
+            currentY = doc.y + 3;
           });
         } else {
-          doc.fontSize(10).text('   Control Mappings: None');
+          doc.text('   Control Mappings: None');
+          currentY = doc.y + 3;
         }
 
         // Evidence summary for program
         const evidenceCount = program.evidence?.length || 0;
-        doc.fontSize(10).text(`   Evidence Files: ${evidenceCount}`);
+        doc.text(`   Evidence Files: ${evidenceCount}`);
+        currentY = doc.y + 3;
         if (evidenceCount > 0) {
           program.evidence.forEach((ev: any, ei: number) => {
-            doc.fontSize(9).text(`     ${ei + 1}. ${ev.fileName} (Uploaded by: ${ev.uploadedBy?.name || 'Unknown'})`);
+            if (ei < 5) { // Limit to first 5 evidence files to save space
+              doc.fontSize(9).text(`     ${ei + 1}. ${ev.fileName} (Uploaded by: ${ev.uploadedBy?.name || 'Unknown'})`);
+              currentY = doc.y + 2;
+            }
           });
+          if (evidenceCount > 5) {
+            doc.fontSize(9).text(`     ... and ${evidenceCount - 5} more files`);
+            currentY = doc.y + 2;
+          }
         }
 
-        doc.moveDown(0.5);
+        doc.fontSize(10);
+        currentY = doc.y + 10;
       });
     } else {
       doc.fontSize(12).text('No audit programs defined.');
+      currentY = doc.y + 10;
     }
-    doc.moveDown();
 
-    // Findings
-    doc.fontSize(14).text('Detailed Findings', { underline: true });
+    // ──────────────────────────────────────────────────────────────
+    // SECTION 4 – DETAILED FINDINGS
+    // ──────────────────────────────────────────────────────────────
+    checkPageBreak(100);
+    this.drawHeading(doc, '4. Detailed Findings');
+    currentY = doc.y + 10;
     if (audit.findings && audit.findings.length > 0) {
       audit.findings.forEach((finding, index) => {
-        doc.fontSize(12).text(`${index + 1}. ${finding.description} (${finding.severity})`);
-        doc.fontSize(10).text(`   Status: ${finding.status}`);
-        if (finding.rootCause) doc.text(`   Root Cause: ${finding.rootCause}`);
-        
-        // Action Plans and Remediation
+        checkPageBreak(80);
+        doc.font('Helvetica-Bold').fontSize(12).text(`${index + 1}. ${finding.description} (${finding.severity})`);
+        currentY = doc.y + 5;
+        doc.font('Helvetica').fontSize(10);
+        doc.text(`   Status: ${finding.status}`);
+        currentY = doc.y + 3;
+        if (finding.rootCause) {
+          doc.text(`   Root Cause: ${finding.rootCause}`);
+          currentY = doc.y + 3;
+        }
+
+        // Action Plans
         if (finding.actionPlans && finding.actionPlans.length > 0) {
           finding.actionPlans.forEach((plan, planIndex) => {
-            doc.fontSize(10).text(`   Action Plan ${planIndex + 1}:`);
-            doc.fontSize(10).text(`     Description: ${plan.description}`);
-            doc.fontSize(10).text(`     Assigned To: ${plan.owner?.name || 'Unassigned'}`);
-            doc.fontSize(10).text(`     Due Date: ${plan.dueDate ? new Date(plan.dueDate).toDateString() : 'Not Set'}`);
-            doc.fontSize(10).text(`     Status: ${plan.status}`);
-            doc.fontSize(10).text(`     Created: ${new Date(plan.createdAt).toDateString()}`);
+            doc.font('Helvetica-Bold').text(`   Action Plan ${planIndex + 1}:`);
+            currentY = doc.y + 3;
+            doc.font('Helvetica');
+            doc.text(`     Description: ${plan.description}`);
+            currentY = doc.y + 3;
+            doc.text(`     Assigned To: ${plan.owner?.name || 'Unassigned'}`);
+            currentY = doc.y + 3;
+            doc.text(`     Due Date:    ${plan.dueDate ? new Date(plan.dueDate).toDateString() : 'Not Set'}`);
+            currentY = doc.y + 3;
+            doc.text(`     Status:      ${plan.status}`);
+            currentY = doc.y + 3;
+            doc.text(`     Created:     ${new Date(plan.createdAt).toDateString()}`);
+            currentY = doc.y + 3;
             if (planIndex < finding.actionPlans.length - 1) {
               doc.text('');
+              currentY = doc.y + 3;
             }
           });
         } else {
           doc.fontSize(10).text('   No action plans assigned.');
+          currentY = doc.y + 5;
         }
-        
-        doc.moveDown(0.5);
+
+        currentY = doc.y + 10;
       });
     } else {
       doc.fontSize(12).text('No findings identified.');
+      currentY = doc.y + 10;
     }
-    doc.moveDown();
 
-    // Action Plans Summary
-    doc.fontSize(14).text('Action Plans Summary', { underline: true });
+    // ──────────────────────────────────────────────────────────────
+    // SECTION 5 – ACTION PLANS SUMMARY
+    // ──────────────────────────────────────────────────────────────
+    checkPageBreak(120);
+    this.drawHeading(doc, '5. Action Plans Summary');
+    currentY = doc.y + 10;
     const actionPlansSummary = audit.findings?.flatMap(f => f.actionPlans || []) || [];
     if (actionPlansSummary.length > 0) {
       const totalPlans = actionPlansSummary.length;
       const openPlans = actionPlansSummary.filter(p => p.status === 'Open').length;
       const inProgressPlans = actionPlansSummary.filter(p => p.status === 'In Progress').length;
       const completedPlans = actionPlansSummary.filter(p => p.status === 'Completed').length;
-      const overduePlans = actionPlansSummary.filter(p => p.dueDate && new Date(p.dueDate) < new Date()).length;
-      
+      const overdueCount = actionPlansSummary.filter(p => p.dueDate && new Date(p.dueDate) < new Date()).length;
+
       doc.fontSize(12).text(`Total Action Plans: ${totalPlans}`);
-      doc.fontSize(12).text(`Open: ${openPlans} | In Progress: ${inProgressPlans} | Completed: ${completedPlans}`);
-      doc.fontSize(12).text(`Overdue: ${overduePlans}`);
-      
-      // Action Plans by Status
-      doc.fontSize(12).text('Action Plans by Status:', { underline: true });
-      doc.fontSize(10).text(`  Open: ${openPlans} plans`);
-      doc.fontSize(10).text(`  In Progress: ${inProgressPlans} plans`);
-      doc.fontSize(10).text(`  Completed: ${completedPlans} plans`);
-      doc.fontSize(10).text(`  Overdue: ${overduePlans} plans`);
-      doc.moveDown();
-      
-      // Action Plans by Assignee
-      doc.fontSize(12).text('Action Plans by Assignee:', { underline: true });
+      currentY = doc.y + 5;
+      doc.text(`Open: ${openPlans} | In Progress: ${inProgressPlans} | Completed: ${completedPlans}`);
+      currentY = doc.y + 5;
+      doc.text(`Overdue: ${overdueCount}`);
+      currentY = doc.y + 10;
+
+      // By Status
+      doc.font('Helvetica-Bold').fontSize(12).text('By Status:', { underline: true });
+      currentY = doc.y + 5;
+      doc.font('Helvetica').fontSize(10);
+      doc.text(`  Open: ${openPlans} plans`);
+      currentY = doc.y + 3;
+      doc.text(`  In Progress: ${inProgressPlans} plans`);
+      currentY = doc.y + 3;
+      doc.text(`  Completed: ${completedPlans} plans`);
+      currentY = doc.y + 3;
+      doc.text(`  Overdue: ${overdueCount} plans`);
+      currentY = doc.y + 10;
+
+      // By Assignee
+      doc.font('Helvetica-Bold').fontSize(12).text('By Assignee:', { underline: true });
+      currentY = doc.y + 5;
+      doc.font('Helvetica').fontSize(10);
       const plansByAssignee = actionPlansSummary.reduce((acc: any, plan: any) => {
         const assignee = plan.owner?.name || 'Unassigned';
         if (!acc[assignee]) acc[assignee] = [];
         acc[assignee].push(plan);
         return acc;
       }, {});
-      
       Object.entries(plansByAssignee).forEach(([assignee, plans]: [string, any]) => {
-        doc.fontSize(10).text(`  ${assignee}: ${plans.length} plans`);
+        doc.text(`  ${assignee}: ${plans.length} plans`);
+        currentY = doc.y + 3;
       });
-      doc.moveDown();
-      
-      // Overdue Action Plans
-      if (overduePlans > 0) {
-        doc.fontSize(12).text('Overdue Action Plans:', { underline: true });
-        overduePlans.forEach((plan: any) => {
-          doc.fontSize(10).text(`  ${plan.description} - ${plan.owner?.name || 'Unassigned'} (Due: ${new Date(plan.dueDate).toDateString()})`);
-        });
-        doc.moveDown();
+      currentY = doc.y + 10;
+
+      // Overdue list
+      if (overdueCount > 0) {
+        doc.font('Helvetica-Bold').fontSize(12).text('Overdue Items:', { underline: true });
+        currentY = doc.y + 5;
+        doc.font('Helvetica').fontSize(10);
+        actionPlansSummary
+          .filter((p: any) => p.dueDate && new Date(p.dueDate) < new Date())
+          .forEach((plan: any) => {
+            doc.text(`  ${plan.description} — ${plan.owner?.name || 'Unassigned'} (Due: ${new Date(plan.dueDate).toDateString()})`);
+            currentY = doc.y + 3;
+          });
+        currentY = doc.y + 10;
       }
     } else {
       doc.fontSize(12).text('No action plans defined.');
+      currentY = doc.y + 10;
     }
-    doc.moveDown();
 
-    // Evidence
-    doc.fontSize(14).text('Evidence Summary', { underline: true });
+    // ──────────────────────────────────────────────────────────────
+    // SECTION 6 – EVIDENCE SUMMARY
+    // ──────────────────────────────────────────────────────────────
+    checkPageBreak(60);
+    this.drawHeading(doc, '6. Evidence Summary');
+    currentY = doc.y + 10;
     let totalEvidence = 0;
-    audit.auditPrograms?.forEach(program => {
-      totalEvidence += program.evidence?.length || 0;
-    });
+    audit.auditPrograms?.forEach(program => { totalEvidence += program.evidence?.length || 0; });
     doc.fontSize(12).text(`Total Evidence Files Uploaded: ${totalEvidence}`);
+    currentY = doc.y + 15;
 
-    // Remediation Status Summary
-    doc.fontSize(14).text('Remediation Status Summary', { underline: true });
+    // ──────────────────────────────────────────────────────────────
+    // SECTION 7 – REMEDIATION STATUS SUMMARY
+    // ──────────────────────────────────────────────────────────────
+    checkPageBreak(120);
+    this.drawHeading(doc, '7. Remediation Status Summary');
+    currentY = doc.y + 10;
     if (actionPlansSummary.length > 0) {
       const remediationStats = {
         total: actionPlansSummary.length,
-        notStarted: actionPlansSummary.filter(p => p.status === 'Open').length,
-        inProgress: actionPlansSummary.filter(p => p.status === 'In Progress').length,
         completed: actionPlansSummary.filter(p => p.status === 'Completed').length,
+        inProgress: actionPlansSummary.filter(p => p.status === 'In Progress').length,
         overdue: actionPlansSummary.filter(p => p.dueDate && new Date(p.dueDate) < new Date()).length,
-        onTime: actionPlansSummary.filter(p => p.dueDate && new Date(p.dueDate) >= new Date()).length
+        onTime: actionPlansSummary.filter(p => p.dueDate && new Date(p.dueDate) >= new Date()).length,
       };
-      
+
       doc.fontSize(12).text(`Total Remediation Items: ${remediationStats.total}`);
-      doc.fontSize(12).text(`Completion Rate: ${Math.round((remediationStats.completed / remediationStats.total) * 100)}%`);
-      doc.fontSize(12).text(`On-Time Completion: ${Math.round((remediationStats.onTime / remediationStats.total) * 100)}%`);
-      doc.fontSize(12).text(`Overdue Items: ${remediationStats.overdue} (${Math.round((remediationStats.overdue / remediationStats.total) * 100)}%)`);
-      
-      // Remediation Timeline
-      doc.fontSize(12).text('Remediation Timeline:', { underline: true });
-      const sortedPlans = actionPlansSummary.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      const recentPlans = sortedPlans.slice(0, 5);
-      recentPlans.forEach((plan: any, index: number) => {
-        doc.fontSize(10).text(`  ${index + 1}. ${plan.description} - Created: ${new Date(plan.createdAt).toDateString()}`);
+      currentY = doc.y + 5;
+      doc.text(`Completion Rate:       ${Math.round((remediationStats.completed / remediationStats.total) * 100)}%`);
+      currentY = doc.y + 5;
+      doc.text(`On-Time Completion:    ${Math.round((remediationStats.onTime / remediationStats.total) * 100)}%`);
+      currentY = doc.y + 5;
+      doc.text(`Overdue Items:         ${remediationStats.overdue} (${Math.round((remediationStats.overdue / remediationStats.total) * 100)}%)`);
+      currentY = doc.y + 10;
+
+      // Timeline
+      doc.font('Helvetica-Bold').fontSize(12).text('Remediation Timeline (latest 5):', { underline: true });
+      currentY = doc.y + 5;
+      doc.font('Helvetica').fontSize(10);
+      const sortedPlans = [...actionPlansSummary].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      sortedPlans.slice(0, 5).forEach((plan: any, index: number) => {
+        doc.text(`  ${index + 1}. ${plan.description} — Created: ${new Date(plan.createdAt).toDateString()}`);
+        currentY = doc.y + 3;
       });
-      doc.moveDown();
-      
+      currentY = doc.y + 10;
+
       // Risk-Based Findings
-      const highRiskFindings = audit.findings?.filter(f => f.severity === 'High' || f.severity === 'Critical').length || 0;
-      const mediumRiskFindings = audit.findings?.filter(f => f.severity === 'Medium').length || 0;
-      const lowRiskFindings = audit.findings?.filter(f => f.severity === 'Low').length || 0;
-      
-      doc.fontSize(12).text('Risk-Based Findings Summary:', { underline: true });
-      doc.fontSize(10).text(`  Critical/High Risk: ${highRiskFindings} findings`);
-      doc.fontSize(10).text(`  Medium Risk: ${mediumRiskFindings} findings`);
-      doc.fontSize(10).text(`  Low Risk: ${lowRiskFindings} findings`);
-      doc.moveDown();
-      
-      // Overdue Action Plans
-      if (remediationStats.overdue > 0) {
-        doc.fontSize(12).text('Overdue Action Plans:', { underline: true });
-        const overduePlansList = actionPlansSummary.filter((p: any) => p.dueDate && new Date(p.dueDate) < new Date());
-        overduePlansList.forEach((plan: any) => {
-          doc.fontSize(10).text(`  ${plan.description} - ${plan.owner?.name || 'Unassigned'} (Due: ${new Date(plan.dueDate).toDateString()})`);
-        });
-        doc.moveDown();
-      }
+      const highRisk = audit.findings?.filter(f => f.severity === 'High' || f.severity === 'Critical').length || 0;
+      const mediumRisk = audit.findings?.filter(f => f.severity === 'Medium').length || 0;
+      const lowRisk = audit.findings?.filter(f => f.severity === 'Low').length || 0;
+
+      doc.font('Helvetica-Bold').fontSize(12).text('Risk-Based Findings:', { underline: true });
+      currentY = doc.y + 5;
+      doc.font('Helvetica').fontSize(10);
+      doc.text(`  Critical / High Risk: ${highRisk} findings`);
+      currentY = doc.y + 3;
+      doc.text(`  Medium Risk:          ${mediumRisk} findings`);
+      currentY = doc.y + 3;
+      doc.text(`  Low Risk:             ${lowRisk} findings`);
+      currentY = doc.y + 10;
     } else {
       doc.fontSize(12).text('No remediation activities defined.');
+      currentY = doc.y + 10;
     }
-    doc.moveDown();
 
-    // Executive Summary
-    doc.fontSize(14).text('Executive Summary', { underline: true });
-    doc.fontSize(12).text(`Audit Completion Rate: ${audit.auditPrograms?.filter(p => p.actualResult === 'Completed').length || 0}/${audit.auditPrograms?.length || 0} programs completed`);
-    doc.fontSize(12).text(`Findings Identified: ${audit.findings?.length || 0} total findings`);
-    doc.fontSize(12).text(`Action Plans Required: ${actionPlansSummary.length} remediation items`);
-    doc.fontSize(12).text(`Evidence Collected: ${totalEvidence} evidence files`);
-    doc.fontSize(12).text(`Audit Period: ${audit.startDate ? new Date(audit.startDate).toDateString() : 'N/A'} to ${audit.endDate ? new Date(audit.endDate).toDateString() : 'N/A'}`);
-    doc.moveDown();
-
+    // End the document to properly close the PDF stream
     doc.end();
   }
 
   async generatePDF(auditId: number, res: Response) {
     const audit = await this.getAuditReportData(auditId);
-    const doc = new PDFDocument();
+    const doc = new PDFDocument({ margins: { top: 50, bottom: 60, left: 50, right: 50 } });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=Audit_Report_${auditId}.pdf`);
 
     doc.pipe(res);
-    await this.buildPDF(doc, audit);
+    
+    // Wait for PDF to finish generating before ending response
+    await new Promise<void>((resolve, reject) => {
+      doc.on('end', () => {
+        resolve();
+      });
+      
+      doc.on('error', (error) => {
+        reject(error);
+      });
+
+      this.buildPDF(doc, audit);
+    });
 
     // Notify relevant users (Manager and Auditors)
     const recipients = [
@@ -629,11 +895,24 @@ export class ReportsService {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
     const filePath = path.join(uploadsDir, `Audit_Report_${auditId}.pdf`);
-    const doc = new PDFDocument();
+    const doc = new PDFDocument({ margins: { top: 50, bottom: 60, left: 50, right: 50 } });
     const writeStream = fs.createWriteStream(filePath);
     doc.pipe(writeStream);
 
-    await this.buildPDF(doc, audit);
+    // Wait for PDF to finish generating and file to be written
+    await new Promise<void>((resolve, reject) => {
+      doc.on('end', () => {
+        resolve();
+      });
+      
+      doc.on('error', (error) => {
+        reject(error);
+      });
+
+      writeStream.on('error', reject);
+      
+      this.buildPDF(doc, audit);
+    });
 
     await new Promise<void>((resolve, reject) => {
       writeStream.on('finish', () => resolve());
@@ -681,7 +960,7 @@ export class ReportsService {
    */
   async streamStoredPDF(auditId: number, res: Response, attachment: boolean = false) {
     const filePath = path.join(__dirname, '..', '..', 'uploads', 'reports', `Audit_Report_${auditId}.pdf`);
-    
+
     if (!fs.existsSync(filePath)) {
       throw new NotFoundException('Report file not found');
     }

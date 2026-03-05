@@ -29,6 +29,16 @@ let AuditController = class AuditController {
     getAll(req) {
         return this.auditService.findAll(req.user);
     }
+    async exportExcel(req, res) {
+        res.set({
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': 'attachment; filename="audits.xlsx"',
+        });
+        return this.auditService.exportExcel(req.user);
+    }
+    getLightweight(req) {
+        return this.auditService.findAllLightweight(req.user);
+    }
     getForOwner(req) {
         const userId = req.user?.userId ?? req.user?.id;
         return this.auditService.findForOwner(Number(userId));
@@ -105,6 +115,23 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AuditController.prototype, "getAll", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Get)('export/excel'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Res)({ passthrough: true })),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], AuditController.prototype, "exportExcel", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Get)('lightweight'),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AuditController.prototype, "getLightweight", null);
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)('owner'),
