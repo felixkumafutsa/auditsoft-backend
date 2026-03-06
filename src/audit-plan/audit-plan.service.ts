@@ -41,7 +41,7 @@ export class AuditPlanService {
       Unassigned: audits.filter(a => !a.quarter)
     };
 
-    // Calculate summary statistics
+    // Calculate summary statistics with defaults for empty data
     const summary = {
       totalAudits: audits.length,
       totalBudget: audits.reduce((sum, audit) => sum + (audit.budgetAllocation || 0), 0),
@@ -62,37 +62,43 @@ export class AuditPlanService {
 
   // Get risk-based audit recommendations
   async getRiskBasedRecommendations(limit: number = 10) {
-    const highRiskUniverse = await this.prisma.auditUniverse.findMany({
-      where: {
-        riskRating: {
-          in: ['High', 'Critical']
-        }
-      },
-      include: {
-        audits: {
-          where: {
-            year: new Date().getFullYear()
+    try {
+      const highRiskUniverse = await this.prisma.auditUniverse.findMany({
+        where: {
+          riskRating: {
+            in: ['High', 'Critical']
           }
         },
-        owner: {
-          select: { id: true, name: true }
+        include: {
+          audits: {
+            where: {
+              year: new Date().getFullYear()
+            }
+          },
+          owner: {
+            select: { id: true, name: true }
+          }
         }
-      }
-    });
+      });
 
-    // Filter entities that haven't been audited this year
-    const recommendations = highRiskUniverse
-      .filter(entity => entity.audits.length === 0)
-      .slice(0, limit)
-      .map(entity => ({
-        entity: entity,
-        recommendedPriority: entity.riskRating === 'Critical' ? 'High' : 'Medium',
-        suggestedQuarter: this.suggestQuarter(entity.riskRating),
-        estimatedHours: this.estimateAuditHours(entity.entityType, entity.riskRating),
-        riskScore: this.calculateRiskScore(entity.riskRating)
-      }));
+      // Filter entities that haven't been audited this year
+      const recommendations = highRiskUniverse
+        .filter(entity => entity.audits.length === 0)
+        .slice(0, limit)
+        .map(entity => ({
+          entity: entity,
+          recommendedPriority: entity.riskRating === 'Critical' ? 'High' : 'Medium',
+          suggestedQuarter: this.suggestQuarter(entity.riskRating),
+          estimatedHours: this.estimateAuditHours(entity.entityType, entity.riskRating),
+          riskScore: this.calculateRiskScore(entity.riskRating)
+        }));
 
-    return recommendations;
+      return recommendations;
+    } catch (error) {
+      // Return empty array if there's any error (e.g., no audit universe data)
+      console.error('Error in getRiskBasedRecommendations:', error);
+      return [];
+    }
   }
 
   // Update audit with strategic information

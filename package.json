@@ -20,7 +20,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:run": "ts-node prisma/seed.ts",
-    "seed:reset-admin": "ts-node prisma/seed-reset-admin.ts"
+    "seed:reset-admin": "ts-node prisma/seed-reset-admin.ts",
+    "db:cleanup": "ts-node scripts/cleanup-database.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
