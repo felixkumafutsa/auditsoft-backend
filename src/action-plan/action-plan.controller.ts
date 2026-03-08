@@ -90,9 +90,11 @@ export class ActionPlanController {
       if (otherFields.length > 0) {
         throw new UnauthorizedException('Managers can only update the status of an action plan');
       }
+      // Manager update - automatic finding transitions will be handled by the service
       return this.actionPlanService.update(id, { status });
     }
 
+    // Chief Auditor update - automatic finding transitions will be handled by the service
     return this.actionPlanService.update(id, updateDto);
   }
 

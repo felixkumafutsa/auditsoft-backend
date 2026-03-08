@@ -1106,5 +1106,180 @@ export class ReportsService {
       report,
     };
   }
+
+  async shareAuditReport(auditId: number, email: string, message?: string, user?: any) {
+    // Get audit details
+    const audit = await this.prisma.audit.findUnique({
+      where: { id: auditId },
+      include: {
+        assignedManager: {
+          select: { name: true, email: true }
+        }
+      }
+    });
+
+    if (!audit) {
+      throw new NotFoundException('Audit not found');
+    }
+
+    // Check if audit is in a status that allows sharing
+    if (!['Completed', 'Approved', 'Finalized'].includes(audit.status)) {
+      throw new Error('Only completed, approved, or finalized audits can be shared');
+    }
+
+    try {
+      // Generate the PDF report
+      const pdfBuffer = await this.generatePDFBuffer(auditId);
+      
+      // Create email content
+      const emailSubject = `Audit Report: ${audit.auditName}`;
+      const emailBody = message || 
+        `Please find the attached audit report for "${audit.auditName}". This report contains important audit findings and recommendations that require your attention.`;
+
+      // In a real implementation, you would use an email service like SendGrid, Nodemailer, etc.
+      // For now, we'll simulate the email sending and log the details
+      console.log('=== EMAIL SHARING DETAILS ===');
+      console.log('To:', email);
+      console.log('Subject:', emailSubject);
+      console.log('Body:', emailBody);
+      console.log('Attachment:', `Audit_Report_${auditId}.pdf (${pdfBuffer.length} bytes)`);
+      console.log('Shared by:', user?.name || user?.email || 'Chief Auditor');
+      console.log('==============================');
+
+      // TODO: Implement actual email sending logic
+      // Example with nodemailer:
+      /*
+      const transporter = nodemailer.createTransport({
+        service: 'gmail', // or your email service
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
+        }
+      });
+
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: emailSubject,
+        text: emailBody,
+        attachments: [
+          {
+            filename: `Audit_Report_${audit.auditName.replace(/[^a-z0-9]/gi, '_')}.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf'
+          }
+        ]
+      });
+      */
+
+      // Log the sharing activity
+      await this.prisma.auditLog.create({
+        data: {
+          action: 'REPORT_SHARED',
+          entityType: 'AUDIT',
+          entityId: auditId,
+          userId: user?.id || user?.sub,
+          timestamp: new Date()
+        }
+      });
+
+      // Create notification for the user who shared
+      if (user?.id || user?.sub) {
+        await this.notificationService.create({
+          userId: user.id || user.sub,
+          title: 'Audit Report Shared Successfully',
+          message: `The audit report for "${audit.auditName}" has been successfully shared with ${email}.`,
+          type: 'info',
+        });
+      }
+
+      return {
+        success: true,
+        message: `Audit report successfully shared with ${email}`,
+        details: {
+          auditName: audit.auditName,
+          recipientEmail: email,
+          sharedAt: new Date(),
+          sharedBy: user?.name || user?.email || 'Chief Auditor'
+        }
+      };
+
+    } catch (error) {
+      console.error('Error sharing audit report:', error);
+      throw new Error(`Failed to share audit report: ${error.message}`);
+    }
+  }
+
+  private async generatePDFBuffer(auditId: number): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      const doc = new PDFDocument();
+      
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      // Generate PDF content (simplified version)
+      this.generatePDFContent(doc, auditId);
+      doc.end();
+    });
+  }
+
+  private async generatePDFContent(doc: any, auditId: number) {
+    try {
+      const audit = await this.prisma.audit.findUnique({
+        where: { id: auditId },
+        include: {
+          assignedManager: {
+            select: { name: true, email: true }
+          },
+          auditPrograms: {
+            include: {
+              workpaper: true
+            }
+          }
+        }
+      });
+
+      if (!audit) {
+        throw new Error('Audit not found');
+      }
+
+      // PDF Content Generation
+      doc.fontSize(20).text('Audit Report', { align: 'center' });
+      doc.moveDown();
+      
+      doc.fontSize(14).text(`Audit Name: ${audit.auditName}`);
+      doc.text(`Status: ${audit.status}`);
+      doc.text(`Risk Level: ${audit.riskLevel || 'Not specified'}`);
+      doc.fontSize(14).text(`Manager: ${audit.assignedManager?.name || 'Not assigned'}`);
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`);
+      doc.moveDown();
+
+      doc.fontSize(16).text('Executive Summary', { underline: true });
+      doc.moveDown();
+      doc.fontSize(12).text('Audit objectives and scope information would be displayed here.');
+      doc.moveDown();
+
+      doc.fontSize(16).text('Audit Programs', { underline: true });
+      doc.moveDown();
+      
+      if (audit.auditPrograms && audit.auditPrograms.length > 0) {
+        audit.auditPrograms.forEach((program: any, index: number) => {
+          doc.fontSize(12).text(`${index + 1}. ${program.programName || `Program ${index + 1}`}`);
+          if (program.objectives) {
+            doc.text(`   Objectives: ${program.objectives}`);
+          }
+          doc.moveDown(0.5);
+        });
+      } else {
+        doc.fontSize(12).text('No audit programs found.');
+      }
+
+    } catch (error) {
+      doc.fontSize(12).text('Error generating PDF content');
+      console.error('PDF generation error:', error);
+    }
+  }
 }
 

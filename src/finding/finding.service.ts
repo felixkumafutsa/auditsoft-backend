@@ -394,6 +394,28 @@ export class FindingService {
   }
 
   /**
+   * Update finding status automatically (bypasses Chief Auditor comment requirement for system-triggered transitions)
+   */
+  async autoUpdateStatus(id: number, newStatus: string, reason: string): Promise<Finding> {
+    const finding = await this.findOne(id);
+
+    // Validate transition using workflow service
+    if (!this.workflowService.canTransition(finding.status, newStatus)) {
+      throw new BadRequestException(
+        `Cannot transition from ${finding.status} to ${newStatus}`,
+      );
+    }
+
+    // Update the finding status without requiring Chief Auditor comment
+    const updatedFinding = await this.update(id, { status: newStatus });
+
+    // Send notifications with automatic transition reason
+    await this.sendStatusChangeNotifications(updatedFinding, finding.status, newStatus, `Automatic transition: ${reason}`);
+
+    return updatedFinding;
+  }
+
+  /**
    * Send notifications when finding status changes
    */
   private async sendStatusChangeNotifications(finding: Finding, oldStatus: string, newStatus: string, chiefAuditorComment?: string) {

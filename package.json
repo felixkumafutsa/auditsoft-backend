@@ -1,8 +1,8 @@
 {
   "name": "backend",
   "version": "0.0.1",
-  "description": "",
-  "author": "",
+  "description": "Auditsoft Backend Application - Enterprise Audit Management System",
+  "author": "Auditsoft",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {

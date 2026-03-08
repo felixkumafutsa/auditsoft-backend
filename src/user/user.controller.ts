@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 const profileStorage = diskStorage({
   destination: './uploads/profile-pictures',
@@ -21,7 +22,10 @@ const profileStorage = diskStorage({
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UserController {
-  constructor(private userService: UserService) { }
+  constructor(
+    private userService: UserService,
+    private auditLogService: AuditLogService
+  ) { }
 
   @Get('me')
   getProfile(@Request() req) {
@@ -74,8 +78,19 @@ export class UserController {
   }
 
   @Delete(':id')
-  delete(@Param('id', ParseIntPipe) id: number) {
-    return this.userService.delete(id);
+  async delete(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    const user = await this.userService.findOne(id);
+    await this.userService.delete(id);
+    
+    // Log the deletion
+    await this.auditLogService.logActionFromRequest({
+      userId: req.user.id.toString(),
+      action: 'DELETE_USER',
+      entityType: 'User',
+      entityId: id.toString(),
+    }, req);
+    
+    return { message: 'User deleted successfully', deletedUser: user };
   }
 
   @Post(':userId/roles/:roleId')

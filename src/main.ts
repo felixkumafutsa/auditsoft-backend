@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2026 Auditsoft
+ * All rights reserved.
+ */
+
 import * as dotenv from 'dotenv';
 dotenv.config(); // Load .env file before anything else
 

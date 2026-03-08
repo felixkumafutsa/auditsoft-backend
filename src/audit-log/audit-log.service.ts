@@ -1,5 +1,11 @@
+/*
+ * Copyright (c) 2026 Auditsoft
+ * All rights reserved.
+ */
+
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { extractRequestInfo, RequestInfo } from '../common/helpers/request-info.helper';
 
 @Injectable()
 export class AuditLogService {
@@ -22,6 +28,22 @@ export class AuditLogService {
         ipAddress: data.ipAddress,
         deviceInfo: data.deviceInfo,
       },
+    });
+  }
+
+  async logActionFromRequest(
+    data: {
+      userId: string;
+      action: string;
+      entityType: string;
+      entityId: string;
+    },
+    req: any
+  ) {
+    const requestInfo = extractRequestInfo(req);
+    return this.logAction({
+      ...data,
+      ...requestInfo,
     });
   }
 

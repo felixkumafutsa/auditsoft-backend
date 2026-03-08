@@ -83,4 +83,10 @@ export class ReportsController {
   async saveAuditReport(@Param('id') id: string, @Request() req) {
     return this.reportsService.saveReport(+id, req.user);
   }
+
+  @Post('audit/:id/share')
+  @Roles('Chief Auditor', 'System Administrator', 'Audit Manager')
+  async shareAuditReport(@Param('id') id: string, @Body() body: { email: string, message?: string }, @Request() req) {
+    return this.reportsService.shareAuditReport(+id, body.email, body.message, req.user);
+  }
 }

@@ -346,6 +346,15 @@ let FindingService = class FindingService {
         await this.sendStatusChangeNotifications(updatedFinding, finding.status, newStatus, chiefAuditorComment);
         return updatedFinding;
     }
+    async autoUpdateStatus(id, newStatus, reason) {
+        const finding = await this.findOne(id);
+        if (!this.workflowService.canTransition(finding.status, newStatus)) {
+            throw new common_1.BadRequestException(`Cannot transition from ${finding.status} to ${newStatus}`);
+        }
+        const updatedFinding = await this.update(id, { status: newStatus });
+        await this.sendStatusChangeNotifications(updatedFinding, finding.status, newStatus, `Automatic transition: ${reason}`);
+        return updatedFinding;
+    }
     async sendStatusChangeNotifications(finding, oldStatus, newStatus, chiefAuditorComment) {
         try {
             if (!finding.auditId)

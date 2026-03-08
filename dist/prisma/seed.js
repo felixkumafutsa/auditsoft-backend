@@ -30,10 +30,6 @@ async function main() {
             description: 'Executes audits, uploads evidence, and drafts findings.',
         },
         {
-            roleName: 'Process Owner',
-            description: 'Views assigned findings, submits remediation evidence, and responds to auditors.',
-        },
-        {
             roleName: 'Board Member',
             description: 'Read-only access to dashboards and executive reports.',
         },

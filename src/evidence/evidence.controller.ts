@@ -87,7 +87,7 @@ export class EvidenceController {
       );
     }
 
-    return this.evidenceService.updateStatus(id, normalizedToStatus, req.user?.id);
+    return this.evidenceService.updateStatus(id, normalizedToStatus, req.user?.id, req);
   }
 
   @Post(':id/versions')
@@ -101,7 +101,7 @@ export class EvidenceController {
     if (!file) {
       throw new BadRequestException('File is required');
     }
-    return this.evidenceService.createVersion(id, file, req.user?.id || 1, changeDescription);
+    return this.evidenceService.createVersion(id, file, req.user?.id || 1, changeDescription, req);
   }
 
   @Get(':id')

@@ -2,10 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateActionPlanDto } from './dto/create-action-plan.dto';
 import { UpdateActionPlanDto } from './dto/update-action-plan.dto';
+import { FindingService } from '../finding/finding.service';
 
 @Injectable()
 export class ActionPlanService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private findingService: FindingService
+  ) {}
 
   async create(createDto: CreateActionPlanDto) {
     return this.prisma.actionPlan.create({
@@ -55,11 +59,40 @@ export class ActionPlanService {
   }
 
   async update(id: number, updateDto: UpdateActionPlanDto) {
-    return this.prisma.actionPlan.update({
+    // Get the current action plan with finding details
+    const currentActionPlan = await this.findOne(id);
+    
+    // Update the action plan
+    const updatedActionPlan = await this.prisma.actionPlan.update({
       where: { id },
       data: updateDto,
       include: { owner: true, finding: true },
     });
+
+    // Handle automatic finding status transitions
+    if (currentActionPlan.finding && updateDto.status) {
+      const finding = currentActionPlan.finding;
+      const oldStatus = currentActionPlan.status;
+      const newStatus = updateDto.status;
+
+      // Rule 1: When action plan status changes to "In Progress", set finding to "Remediation In Progress"
+      if (oldStatus !== 'In Progress' && newStatus === 'In Progress') {
+        if (finding.status === 'Action Assigned') {
+          await this.findingService.autoUpdateStatus(finding.id, 'Remediation In Progress', 'Action plan marked as in progress');
+          console.log(`Finding ${finding.id} automatically transitioned to 'Remediation In Progress' due to action plan ${id} status change`);
+        }
+      }
+
+      // Rule 2: When action plan status changes to "Closed", set finding to "Verified"
+      if (oldStatus !== 'Closed' && newStatus === 'Closed') {
+        if (finding.status === 'Remediation In Progress') {
+          await this.findingService.autoUpdateStatus(finding.id, 'Verified', 'Action plan completed');
+          console.log(`Finding ${finding.id} automatically transitioned to 'Verified' due to action plan ${id} completion`);
+        }
+      }
+    }
+
+    return updatedActionPlan;
   }
 
   async remove(id: number) {

@@ -1,7 +1,9 @@
 import { UserService, CreateUserDto, UpdateUserDto, CreateProcessOwnerDto } from './user.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 export declare class UserController {
     private userService;
-    constructor(userService: UserService);
+    private auditLogService;
+    constructor(userService: UserService, auditLogService: AuditLogService);
     getProfile(req: any): Promise<Omit<{
         name: string;
         email: string;
@@ -59,17 +61,20 @@ export declare class UserController {
         createdAt: Date;
         updatedAt: Date;
     }, "passwordHash">>;
-    delete(id: number): Promise<Omit<{
-        name: string;
-        email: string;
-        status: string;
-        mfaEnabled: boolean;
-        profilePicture: string | null;
-        id: number;
-        passwordHash: string;
-        createdAt: Date;
-        updatedAt: Date;
-    }, "passwordHash">>;
+    delete(id: number, req: any): Promise<{
+        message: string;
+        deletedUser: Omit<{
+            name: string;
+            email: string;
+            status: string;
+            mfaEnabled: boolean;
+            profilePicture: string | null;
+            id: number;
+            passwordHash: string;
+            createdAt: Date;
+            updatedAt: Date;
+        }, "passwordHash">;
+    }>;
     assignRole(userId: number, roleId: number): Promise<any>;
     removeRole(userId: number, roleId: number): Promise<void>;
     createProcessOwner(data: CreateProcessOwnerDto): Promise<Omit<{

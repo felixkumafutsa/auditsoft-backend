@@ -22,6 +22,7 @@ const uuid_1 = require("uuid");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 const roles_guard_1 = require("../common/guards/roles.guard");
 const roles_decorator_1 = require("../common/decorators/roles.decorator");
+const audit_log_service_1 = require("../audit-log/audit-log.service");
 const profileStorage = (0, multer_1.diskStorage)({
     destination: './uploads/profile-pictures',
     filename: (req, file, cb) => {
@@ -33,8 +34,10 @@ const profileStorage = (0, multer_1.diskStorage)({
 });
 let UserController = class UserController {
     userService;
-    constructor(userService) {
+    auditLogService;
+    constructor(userService, auditLogService) {
         this.userService = userService;
+        this.auditLogService = auditLogService;
     }
     getProfile(req) {
         return this.userService.findOne(req.user.id);
@@ -61,8 +64,16 @@ let UserController = class UserController {
     update(id, data) {
         return this.userService.update(id, data);
     }
-    delete(id) {
-        return this.userService.delete(id);
+    async delete(id, req) {
+        const user = await this.userService.findOne(id);
+        await this.userService.delete(id);
+        await this.auditLogService.logActionFromRequest({
+            userId: req.user.id.toString(),
+            action: 'DELETE_USER',
+            entityType: 'User',
+            entityId: id.toString(),
+        }, req);
+        return { message: 'User deleted successfully', deletedUser: user };
     }
     assignRole(userId, roleId) {
         return this.userService.assignRole(userId, roleId);
@@ -144,9 +155,10 @@ __decorate([
 __decorate([
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", Promise)
 ], UserController.prototype, "delete", null);
 __decorate([
     (0, common_1.Post)(':userId/roles/:roleId'),
@@ -182,6 +194,7 @@ __decorate([
 exports.UserController = UserController = __decorate([
     (0, common_1.Controller)('users'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    __metadata("design:paramtypes", [user_service_1.UserService])
+    __metadata("design:paramtypes", [user_service_1.UserService,
+        audit_log_service_1.AuditLogService])
 ], UserController);
 //# sourceMappingURL=user.controller.js.map

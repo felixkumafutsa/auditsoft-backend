@@ -33,5 +33,6 @@ export declare class FindingService {
     getCriticalFindings(): Promise<Finding[]>;
     getOverdueFindings(): Promise<Finding[]>;
     updateStatus(id: number, newStatus: string, userRole?: string, chiefAuditorComment?: string): Promise<Finding>;
+    autoUpdateStatus(id: number, newStatus: string, reason: string): Promise<Finding>;
     private sendStatusChangeNotifications;
 }

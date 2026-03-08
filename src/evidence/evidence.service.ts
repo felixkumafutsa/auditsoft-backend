@@ -51,13 +51,23 @@ export class EvidenceService {
       },
     });
 
-    // Log action
-    await this.auditLogService.logAction({
-      userId: (uploadedById || 1).toString(),
-      action: 'UPLOAD_EVIDENCE',
-      entityType: 'Evidence',
-      entityId: created.id.toString(),
-    });
+    // Log action with request info if available
+    if (user) {
+      await this.auditLogService.logActionFromRequest({
+        userId: (uploadedById || 1).toString(),
+        action: 'UPLOAD_EVIDENCE',
+        entityType: 'Evidence',
+        entityId: created.id.toString(),
+      }, user);
+    } else {
+      // Fallback for cases where request context is not available
+      await this.auditLogService.logAction({
+        userId: (uploadedById || 1).toString(),
+        action: 'UPLOAD_EVIDENCE',
+        entityType: 'Evidence',
+        entityId: created.id.toString(),
+      });
+    }
 
     // Persist file to local storage for download/preview
     try {
@@ -195,7 +205,7 @@ export class EvidenceService {
     };
   }
 
-  async createVersion(id: number, file: any, uploadedById: number, changeDescription?: string) {
+  async createVersion(id: number, file: any, uploadedById: number, changeDescription?: string, user?: any) {
     const evidence = await this.prisma.evidence.findUnique({
       where: { id },
     });
@@ -245,18 +255,28 @@ export class EvidenceService {
       console.error('Failed to persist evidence version file', e);
     }
 
-    // Log action
-    await this.auditLogService.logAction({
-      userId: uploadedById.toString(),
-      action: 'CREATE_EVIDENCE_VERSION',
-      entityType: 'Evidence',
-      entityId: id.toString(),
-    });
+    // Log action with request info if available
+    if (user) {
+      await this.auditLogService.logActionFromRequest({
+        userId: uploadedById.toString(),
+        action: 'CREATE_EVIDENCE_VERSION',
+        entityType: 'Evidence',
+        entityId: id.toString(),
+      }, user);
+    } else {
+      // Fallback for cases where request context is not available
+      await this.auditLogService.logAction({
+        userId: uploadedById.toString(),
+        action: 'CREATE_EVIDENCE_VERSION',
+        entityType: 'Evidence',
+        entityId: id.toString(),
+      });
+    }
 
     return version;
   }
 
-  async updateStatus(id: number, status: string, userId?: number) {
+  async updateStatus(id: number, status: string, userId?: number, user?: any) {
     const evidence = await this.findOne(id);
     if (!evidence) throw new BadRequestException('Evidence not found');
 
@@ -283,14 +303,24 @@ export class EvidenceService {
       include: { auditProgram: true }
     });
 
-    // Log action
+    // Log action with request info if available
     if (userId) {
-      await this.auditLogService.logAction({
-        userId: userId.toString(),
-        action: `UPDATE_EVIDENCE_STATUS_${status}`,
-        entityType: 'Evidence',
-        entityId: id.toString(),
-      });
+      if (user) {
+        await this.auditLogService.logActionFromRequest({
+          userId: userId.toString(),
+          action: `UPDATE_EVIDENCE_STATUS_${status}`,
+          entityType: 'Evidence',
+          entityId: id.toString(),
+        }, user);
+      } else {
+        // Fallback for cases where request context is not available
+        await this.auditLogService.logAction({
+          userId: userId.toString(),
+          action: `UPDATE_EVIDENCE_STATUS_${status}`,
+          entityType: 'Evidence',
+          entityId: id.toString(),
+        });
+      }
     }
 
     // Notifications
