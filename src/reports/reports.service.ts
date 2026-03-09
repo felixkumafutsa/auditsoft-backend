@@ -73,20 +73,25 @@ export class GenerateCustomReportDto {
 
 @Injectable()
 export class ReportsService {
-  private emailTransporter: nodemailer.Transporter;
+  private emailTransporter: nodemailer.Transporter | null;
 
   constructor(
     private prisma: PrismaService,
     private notificationService?: NotificationService
   ) {
-    // Initialize email transporter
-    this.emailTransporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER || 'auditsoft@example.com',
-        pass: process.env.EMAIL_PASS || 'your-app-password'
-      }
-    });
+    // Initialize email transporter only if credentials are available
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      this.emailTransporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
+        }
+      });
+    } else {
+      console.log('Email credentials not configured. Email sharing will be logged only.');
+      this.emailTransporter = null;
+    }
   }
 
   // ... existing methods ...
@@ -314,7 +319,7 @@ export class ReportsService {
   }
 
   private async generatePDFBuffer(auditId: number): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       const buffers: Buffer[] = [];
       const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
 
@@ -322,8 +327,8 @@ export class ReportsService {
       doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', reject);
 
-      // Generate PDF content
-      this.generatePDFContent(doc, auditId);
+      // Generate PDF content (await the content generation)
+      await this.generatePDFContent(doc, auditId);
       doc.end();
     });
   }
@@ -417,26 +422,37 @@ export class ReportsService {
         `Please find the attached custom report "${report.title}". This report contains important audit information that requires your attention.`;
 
       // Send email with attachment
-      try {
-        const mailOptions = {
-          from: process.env.EMAIL_USER || 'auditsoft@example.com',
-          to: email,
-          subject: emailSubject,
-          text: emailBody,
-          attachments: [
-            {
-              filename: `Custom_Report_${report.title.replace(/[^a-z0-9]/gi, '_')}.pdf`,
-              content: report.filePath ? fs.readFileSync(report.filePath) : Buffer.alloc(0),
-              contentType: 'application/pdf'
-            }
-          ]
-        };
+      if (this.emailTransporter) {
+        try {
+          const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: emailSubject,
+            text: emailBody,
+            attachments: [
+              {
+                filename: `Custom_Report_${report.title.replace(/[^a-z0-9]/gi, '_')}.pdf`,
+                content: report.filePath ? fs.readFileSync(report.filePath) : Buffer.from(''),
+                contentType: 'application/pdf'
+              }
+            ]
+          };
 
-        await this.emailTransporter.sendMail(mailOptions);
-        console.log('Custom report email sent successfully to:', email);
-      } catch (emailError) {
-        console.error('Failed to send custom report email:', emailError);
-        throw new InternalServerErrorException('Failed to send email');
+          await this.emailTransporter.sendMail(mailOptions);
+          console.log('Custom report email sent successfully to:', email);
+        } catch (emailError) {
+          console.error('Failed to send custom report email:', emailError);
+          console.log('Email sharing failed, but notification will be created.');
+        }
+      } else {
+        console.log('=== CUSTOM REPORT EMAIL SHARING LOGGED (No Email Configured) ===');
+        console.log('Report ID:', id);
+        console.log('Report Title:', report.title);
+        console.log('To:', email);
+        console.log('Subject:', emailSubject);
+        console.log('Body:', emailBody);
+        console.log('Shared by:', user?.name || user?.email || 'Chief Auditor');
+        console.log('============================================================');
       }
 
       // Create notification if notification service exists
@@ -2009,26 +2025,37 @@ export class ReportsService {
         `Please find the attached audit report for "${audit.auditName}". This report contains important audit findings and recommendations that require your attention.`;
 
       // Send email with attachment
-      try {
-        const mailOptions = {
-          from: process.env.EMAIL_USER || 'auditsoft@example.com',
-          to: email,
-          subject: emailSubject,
-          text: emailBody,
-          attachments: [
-            {
-              filename: `Audit_Report_${audit.auditName.replace(/[^a-z0-9]/gi, '_')}.pdf`,
-              content: pdfBuffer,
-              contentType: 'application/pdf'
-            }
-          ]
-        };
+      if (this.emailTransporter) {
+        try {
+          const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: emailSubject,
+            text: emailBody,
+            attachments: [
+              {
+                filename: `Audit_Report_${audit.auditName.replace(/[^a-z0-9]/gi, '_')}.pdf`,
+                content: pdfBuffer,
+                contentType: 'application/pdf'
+              }
+            ]
+          };
 
-        await this.emailTransporter.sendMail(mailOptions);
-        console.log('Email sent successfully to:', email);
-      } catch (emailError) {
-        console.error('Failed to send email:', emailError);
-        throw new InternalServerErrorException('Failed to send email');
+          await this.emailTransporter.sendMail(mailOptions);
+          console.log('Email sent successfully to:', email);
+        } catch (emailError) {
+          console.error('Failed to send email:', emailError);
+          // Don't throw error, just log it and continue with notification
+          console.log('Email sharing failed, but notification will be created.');
+        }
+      } else {
+        console.log('=== EMAIL SHARING LOGGED (No Email Configured) ===');
+        console.log('To:', email);
+        console.log('Subject:', emailSubject);
+        console.log('Body:', emailBody);
+        console.log('Attachment:', `Audit_Report_${audit.auditName.replace(/[^a-z0-9]/gi, '_')}.pdf (${pdfBuffer.length} bytes)`);
+        console.log('Shared by:', user?.name || user?.email || 'Chief Auditor');
+        console.log('================================================');
       }
 
       // Create notification if notification service exists
