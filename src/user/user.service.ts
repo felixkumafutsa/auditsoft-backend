@@ -62,20 +62,6 @@ export class UpdateUserDto {
   profilePicture?: string;
 }
 
-export class CreateProcessOwnerDto {
-  @IsString()
-  name: string;
-
-  @IsEmail()
-  email: string;
-
-  @IsString()
-  password: string;
-
-  @IsNumber()
-  auditUniverseId: number;
-}
-
 @Injectable()
 export class UserService {
   constructor(private prisma: PrismaService) { }
@@ -159,9 +145,6 @@ export class UserService {
         profilePicture: (data as any).profilePicture || undefined,
         status: data.status || 'active',
         mfaEnabled: data.mfaEnabled || false,
-        auditUniverseOwner: data.auditUniverseEntityIds ? {
-          connect: data.auditUniverseEntityIds.map(id => ({ id }))
-        } : undefined,
       },
       select: {
         id: true,
@@ -201,9 +184,6 @@ export class UserService {
         mfaEnabled: data.mfaEnabled,
         passwordHash: passwordHash,
         profilePicture: (data as any).profilePicture || undefined,
-        auditUniverseOwner: data.auditUniverseEntityIds ? {
-          set: data.auditUniverseEntityIds.map(id => ({ id }))
-        } : undefined,
       },
       select: {
         id: true,
@@ -407,68 +387,5 @@ export class UserService {
     }
 
     return tasks;
-  }
-
-  /**
-   * Create a Process Owner user and assign them to an Audit Universe
-   */
-  async createProcessOwner(data: CreateProcessOwnerDto): Promise<Omit<User, 'passwordHash'>> {
-    if (!data.name || !data.email || !data.password || !data.auditUniverseId) {
-      throw new BadRequestException('Name, email, password, and auditUniverseId are required');
-    }
-
-    const existingUser = await this.findByEmail(data.email);
-    if (existingUser) {
-      throw new BadRequestException('Email already in use');
-    }
-
-    // Verify the audit universe exists
-    const auditUniverse = await this.prisma.auditUniverse.findUnique({
-      where: { id: data.auditUniverseId },
-    });
-    if (!auditUniverse) {
-      throw new BadRequestException(`Audit Universe with ID ${data.auditUniverseId} not found`);
-    }
-
-    // Get the Process Owner role
-    const processOwnerRole = await this.prisma.role.findUnique({
-      where: { roleName: 'Process Owner' },
-    });
-    if (!processOwnerRole) {
-      throw new BadRequestException('Process Owner role not found');
-    }
-
-    const passwordHash = await this.hashPassword(data.password);
-
-    // Create user with Process Owner role and link to Audit Universe
-    return this.prisma.user.create({
-      data: {
-        name: data.name,
-        email: data.email,
-        passwordHash: passwordHash,
-        status: 'active',
-        mfaEnabled: false,
-        userRoles: {
-          create: [{
-            roleId: processOwnerRole.id,
-          }],
-        },
-        auditUniverseOwner: {
-          connect: { id: data.auditUniverseId },
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        profilePicture: true,
-        status: true,
-        mfaEnabled: true,
-        createdAt: true,
-        updatedAt: true,
-        userRoles: { include: { role: true } },
-        auditUniverseOwner: true,
-      },
-    });
   }
 }

@@ -1,7 +1,7 @@
 // src/workflow/finding.workflow.ts
-// Finding Lifecycle: Identified → Validated → Action Assigned → Remediation In Progress → Verified → Closed
+// Finding Lifecycle: Identified → Validated → Action Assigned → Remediation In Progress → Closed
 // Auditor identifies, Manager validates, Chief Auditor assigns action, Chief Auditor manages remediation progress,
-// Chief Auditor verifies (with comment), Chief Auditor closes (with comment)
+// Chief Auditor closes (with comment)
 
 import { Injectable, BadRequestException } from '@nestjs/common';
 
@@ -10,7 +10,6 @@ export enum FindingStatus {
   VALIDATED = 'Validated',
   ACTION_ASSIGNED = 'Action Assigned',
   REMEDIATION_IN_PROGRESS = 'Remediation In Progress',
-  VERIFIED = 'Verified',
   CLOSED = 'Closed',
 }
 
@@ -23,19 +22,17 @@ export enum FindingSeverity {
 
 // Actions that require Chief Auditor comments
 export const CHIEF_AUDITOR_FINDING_COMMENT_REQUIRED = [
-  { from: 'Remediation In Progress', to: 'Verified' },
-  { from: 'Verified', to: 'Closed' },
+  { from: 'Remediation In Progress', to: 'Closed' },
 ];
 
 @Injectable()
 export class FindingWorkflowService {
-  // Strict lifecycle: Identified → Validated → Action Assigned → Remediation In Progress → Verified → Closed
+  // Strict lifecycle: Identified → Validated → Action Assigned → Remediation In Progress → Closed
   private readonly validTransitions: Record<FindingStatus, FindingStatus[]> = {
     [FindingStatus.IDENTIFIED]: [FindingStatus.VALIDATED],
     [FindingStatus.VALIDATED]: [FindingStatus.ACTION_ASSIGNED],
     [FindingStatus.ACTION_ASSIGNED]: [FindingStatus.REMEDIATION_IN_PROGRESS],
-    [FindingStatus.REMEDIATION_IN_PROGRESS]: [FindingStatus.VERIFIED],
-    [FindingStatus.VERIFIED]: [FindingStatus.CLOSED],
+    [FindingStatus.REMEDIATION_IN_PROGRESS]: [FindingStatus.CLOSED],
     [FindingStatus.CLOSED]: [], // Terminal state
   };
 
@@ -79,8 +76,7 @@ export class FindingWorkflowService {
    * Get role-based permissions for status transitions
    * Auditor: identifies
    * Manager: validates
-   * Chief Auditor: assigns action, manages remediation, verifies (with comment), closes (with comment)
-   * Process Owner: views dashboard and reports (no status management)
+   * Chief Auditor: assigns action, manages remediation, closes (with comment)
    */
   getPermittedRoles(fromStatus: string, toStatus: string): string[] {
     const transitions: Record<string, Record<string, string[]>> = {
@@ -94,9 +90,6 @@ export class FindingWorkflowService {
         [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
       },
       [FindingStatus.REMEDIATION_IN_PROGRESS]: {
-        [FindingStatus.VERIFIED]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
-      },
-      [FindingStatus.VERIFIED]: {
         [FindingStatus.CLOSED]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
       },
     };

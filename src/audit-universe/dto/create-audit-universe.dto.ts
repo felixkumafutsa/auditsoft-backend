@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional } from 'class-validator';
+import { IsString, IsOptional } from 'class-validator';
 
 export class CreateAuditUniverseDto {
   @IsString()
@@ -10,8 +10,4 @@ export class CreateAuditUniverseDto {
   @IsString()
   @IsOptional()
   riskRating?: string;
-
-  @IsNumber()
-  @IsOptional()
-  ownerId?: number;
 }

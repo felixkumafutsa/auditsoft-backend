@@ -22,7 +22,6 @@ model User {
   managedAudits           Audit[]           @relation("auditManager")
   executiveApprovedAudits Audit[]           @relation("auditExecutiveApprover")
   auditLogActivity        AuditLog[]
-  auditUniverseOwner      AuditUniverse[]
   uploadedEvidence        Evidence[]
   evidenceVersions        EvidenceVersion[]
   assignedFindings        Finding[]         @relation("FindingAssignee")
@@ -31,6 +30,8 @@ model User {
   sentMessages            Message[]         @relation("SentMessages")
   notifications           Notification[]
   generatedReports        Report[]
+  reportFiles             ReportFile[]       @relation("ReportGenerator")
+  customReports           CustomReport[]     @relation("CustomReportGenerator")
   risksOwned              Risk[]            @relation("RiskOwner")
   timesheets              Timesheet[]
   userRoles               UserRole[]
@@ -78,13 +79,10 @@ model AuditUniverse {
   entityType String
   entityName String
   riskRating String
-  ownerId    Int
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   audits     Audit[]
-  owner      User     @relation(fields: [ownerId], references: [id])
 
-  @@index([ownerId], map: "AuditUniverse_ownerId_fkey")
 }
 
 model Audit {
@@ -116,6 +114,8 @@ model Audit {
   auditPrograms         AuditProgram[]
   findings              Finding[]
   reports               Report[]
+  reportFiles           ReportFile[]
+  customReports         CustomReport[]
   timesheets            Timesheet[]
   risks                 Risk[]         @relation("AuditRisks")
   assignedAuditors      User[]         @relation("auditAuditors")
@@ -165,6 +165,43 @@ model Report {
 
   @@index([auditId], map: "Report_auditId_fkey")
   @@index([generatedBy], map: "Report_generatedBy_fkey")
+}
+
+model ReportFile {
+  id          Int      @id @default(autoincrement())
+  auditId     Int
+  fileName    String
+  filePath    String
+  fileType    String   @default("pdf")
+  fileSize    Int
+  generatedAt DateTime @default(now())
+  generatedBy Int
+  audit       Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  generator   User     @relation("ReportGenerator", fields: [generatedBy], references: [id])
+
+  @@index([auditId], map: "ReportFile_auditId_fkey")
+  @@index([generatedBy], map: "ReportFile_generatedBy_fkey")
+}
+
+model CustomReport {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  reportData  String   // JSON string containing the report configuration and data
+  reportType  String   @default("custom") // "custom", "template"
+  auditId     Int?     // Optional: if report is for specific audit
+  generatedAt DateTime @default(now())
+  generatedBy Int
+  filePath    String?  // Optional: if report is saved as file
+  fileType    String?  @default("pdf")
+  fileSize    Int?
+  isTemplate  Boolean  @default(false)
+  templateName String? // Name of the template if this is an instance of a template
+  audit       Audit?   @relation(fields: [auditId], references: [id])
+  generator   User     @relation("CustomReportGenerator", fields: [generatedBy], references: [id])
+
+  @@index([auditId], map: "CustomReport_auditId_fkey")
+  @@index([generatedBy], map: "CustomReport_generatedBy_fkey")
 }
 
 model Evidence {

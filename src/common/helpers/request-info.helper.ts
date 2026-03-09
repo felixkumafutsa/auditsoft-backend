@@ -12,7 +12,7 @@ export function extractRequestInfo(req: any): RequestInfo {
   const requestInfo: RequestInfo = {};
 
   // Extract IP Address
-  if (req) {
+  if (req && req.headers) {
     const forwarded = req.headers['x-forwarded-for'];
     const ip = forwarded ? forwarded.split(',')[0] : req.connection?.remoteAddress || req.socket?.remoteAddress;
     requestInfo.ipAddress = ip ? ip.replace('::ffff:', '') : undefined;

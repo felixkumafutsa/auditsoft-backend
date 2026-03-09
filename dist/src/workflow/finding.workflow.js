@@ -14,7 +14,6 @@ var FindingStatus;
     FindingStatus["VALIDATED"] = "Validated";
     FindingStatus["ACTION_ASSIGNED"] = "Action Assigned";
     FindingStatus["REMEDIATION_IN_PROGRESS"] = "Remediation In Progress";
-    FindingStatus["VERIFIED"] = "Verified";
     FindingStatus["CLOSED"] = "Closed";
 })(FindingStatus || (exports.FindingStatus = FindingStatus = {}));
 var FindingSeverity;
@@ -25,16 +24,14 @@ var FindingSeverity;
     FindingSeverity["LOW"] = "Low";
 })(FindingSeverity || (exports.FindingSeverity = FindingSeverity = {}));
 exports.CHIEF_AUDITOR_FINDING_COMMENT_REQUIRED = [
-    { from: 'Remediation In Progress', to: 'Verified' },
-    { from: 'Verified', to: 'Closed' },
+    { from: 'Remediation In Progress', to: 'Closed' },
 ];
 let FindingWorkflowService = class FindingWorkflowService {
     validTransitions = {
         [FindingStatus.IDENTIFIED]: [FindingStatus.VALIDATED],
         [FindingStatus.VALIDATED]: [FindingStatus.ACTION_ASSIGNED],
         [FindingStatus.ACTION_ASSIGNED]: [FindingStatus.REMEDIATION_IN_PROGRESS],
-        [FindingStatus.REMEDIATION_IN_PROGRESS]: [FindingStatus.VERIFIED],
-        [FindingStatus.VERIFIED]: [FindingStatus.CLOSED],
+        [FindingStatus.REMEDIATION_IN_PROGRESS]: [FindingStatus.CLOSED],
         [FindingStatus.CLOSED]: [],
     };
     requiresChiefAuditorComment(fromStatus, toStatus) {
@@ -68,9 +65,6 @@ let FindingWorkflowService = class FindingWorkflowService {
                 [FindingStatus.REMEDIATION_IN_PROGRESS]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
             },
             [FindingStatus.REMEDIATION_IN_PROGRESS]: {
-                [FindingStatus.VERIFIED]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
-            },
-            [FindingStatus.VERIFIED]: {
                 [FindingStatus.CLOSED]: ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'],
             },
         };

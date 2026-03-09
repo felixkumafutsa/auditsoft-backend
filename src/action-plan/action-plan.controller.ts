@@ -76,7 +76,7 @@ export class ActionPlanController {
     const roleNames = roles.map(r => typeof r === 'string' ? r : (r?.roleName || r?.name || ''));
 
     const isChiefAuditor = roleNames.some(role => ['Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)'].includes(role));
-    const isManager = roleNames.some(role => ['Manager', 'Audit Manager', 'Process Owner'].includes(role));
+    const isManager = roleNames.some(role => ['Manager', 'Audit Manager'].includes(role));
 
     if (!isChiefAuditor && !isManager) {
       throw new UnauthorizedException('Only Managers and Chief Auditors can update action plans');

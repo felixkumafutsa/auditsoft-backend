@@ -32,7 +32,7 @@ export class ActionPlanService {
           lt: new Date(),
         },
         status: {
-          notIn: ['Closed', 'Verified'],
+          notIn: ['Closed'],
         },
       },
       include: { owner: true, finding: true },
@@ -83,11 +83,11 @@ export class ActionPlanService {
         }
       }
 
-      // Rule 2: When action plan status changes to "Closed", set finding to "Verified"
+      // Rule 2: When action plan status changes to "Closed", set finding to "Closed"
       if (oldStatus !== 'Closed' && newStatus === 'Closed') {
         if (finding.status === 'Remediation In Progress') {
-          await this.findingService.autoUpdateStatus(finding.id, 'Verified', 'Action plan completed');
-          console.log(`Finding ${finding.id} automatically transitioned to 'Verified' due to action plan ${id} completion`);
+          await this.findingService.autoUpdateStatus(finding.id, 'Closed', 'Action plan completed');
+          console.log(`Finding ${finding.id} automatically transitioned to 'Closed' due to action plan ${id} completion`);
         }
       }
     }

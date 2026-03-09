@@ -12,12 +12,12 @@ export class ReportsController {
 
   @Post('custom')
   @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager')
-  async generateCustomReport(@Body() dto: GenerateCustomReportDto, @Res() res: express.Response) {
-    return this.reportsService.generateCustomReport(dto, res);
+  async generateCustomReport(@Body() dto: GenerateCustomReportDto, @Res() res: express.Response, @Request() req) {
+    return this.reportsService.generateCustomReport(dto, res, req.user);
   }
 
   @Get('executive')
-  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager', 'Board Member', 'Process Owner')
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager', 'Board Member')
   getExecutiveReport() {
     return this.reportsService.getExecutiveReport();
   }
@@ -40,46 +40,77 @@ export class ReportsController {
     return this.reportsService.getReportsList(req?.user);
   }
 
-  @Get('audit/:id/pdf')
-  @Roles('Chief Auditor', 'System Administrator', 'Audit Manager')
-  async downloadAuditReportPDF(@Param('id') id: string, @Res() res: express.Response) {
-    return this.reportsService.generatePDF(+id, res);
+  @Get('tabbed-list')
+  @Roles('Audit Manager', 'Chief Auditor', 'System Administrator')
+  async getTabbedReportsList(@Request() req) {
+    return this.reportsService.getTabbedReportsList(req?.user);
   }
 
-  @Get('audit/:id/docx')
+  @Get('custom-reports')
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager')
+  async getCustomReports(@Request() req) {
+    return this.reportsService.getCustomReports(req?.user);
+  }
+
+  @Get('custom-reports/templates')
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager')
+  async getCustomReportTemplates(@Request() req) {
+    return this.reportsService.getCustomReportTemplates(req?.user);
+  }
+
+  @Get('custom-reports/:id/download')
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager')
+  async downloadCustomReport(@Param('id') id: string, @Res() res: express.Response) {
+    return this.reportsService.downloadCustomReport(+id, res);
+  }
+
+  @Post('custom-reports/:id/share')
   @Roles('Chief Auditor', 'System Administrator', 'Audit Manager')
-  async downloadAuditReportWord(@Param('id') id: string, @Res() res: express.Response) {
-    return this.reportsService.generateWord(+id, res);
+  async shareCustomReport(@Param('id') id: string, @Body() body: { email: string, message?: string }, @Request() req) {
+    return this.reportsService.shareCustomReport(+id, body.email, body.message, req.user);
+  }
+
+  @Post('custom/save')
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager')
+  async saveCustomReport(@Body() data: any, @Request() req) {
+    return this.reportsService.saveCustomReport({
+      title: data.name || data.title || 'Custom Report', // Handle both name and title from frontend
+      description: data.description,
+      reportData: JSON.stringify({
+        fields: data.fields,
+        filters: data.filters
+      }),
+      reportType: 'custom',
+      auditId: null,
+      generatedBy: req.user?.id || req.user?.sub,
+      filePath: null,
+      fileType: null,
+      fileSize: null,
+      isTemplate: false,
+      templateName: data.templateName
+    });
+  }
+
+  @Get('saved')
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager')
+  async getSavedReports(@Request() req) {
+    return this.reportsService.getCustomReports(req?.user);
   }
 
   @Get('audit/:id/preview')
-  @Roles('Manager', 'Audit Manager', 'Chief Auditor')
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager', 'Auditor')
   async previewAuditReport(@Param('id') id: string, @Res() res: express.Response) {
     return this.reportsService.streamStoredPDF(+id, res, false);
   }
 
   @Get('audit/:id/file')
-  @Roles('Chief Auditor', 'System Administrator', 'Audit Manager')
-  async downloadStoredAuditReport(@Param('id') id: string, @Res() res: express.Response) {
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager', 'Auditor')
+  async downloadAuditReport(@Param('id') id: string, @Res() res: express.Response) {
     return this.reportsService.streamStoredPDF(+id, res, true);
   }
 
-  @Post('custom/save')
-  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager')
-  async saveCustomReport(@Body() data: any) {
-    // Mock save: Prisma schema doesn't have a SavedReport table yet
-    return { success: true, message: 'Report template saved successfully (mock)' };
-  }
-
-  @Get('saved')
-  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager')
-  async getSavedReports() {
-    // Mock endpoint
-    return [];
-  }
-
   @Post('audit/:id/save')
-  @Roles('Manager', 'Audit Manager')
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager')
   async saveAuditReport(@Param('id') id: string, @Request() req) {
     return this.reportsService.saveReport(+id, req.user);
   }
@@ -88,5 +119,17 @@ export class ReportsController {
   @Roles('Chief Auditor', 'System Administrator', 'Audit Manager')
   async shareAuditReport(@Param('id') id: string, @Body() body: { email: string, message?: string }, @Request() req) {
     return this.reportsService.shareAuditReport(+id, body.email, body.message, req.user);
+  }
+
+  @Get('audit/:id/pdf')
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager', 'Auditor')
+  async downloadAuditReportPDF(@Param('id') id: string, @Res() res: express.Response) {
+    return this.reportsService.streamStoredPDF(+id, res, true);
+  }
+
+  @Get('audit/:id/docx')
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager', 'Auditor')
+  async downloadAuditReportWord(@Param('id') id: string, @Res() res: express.Response) {
+    return this.reportsService.generateWord(+id, res);
   }
 }

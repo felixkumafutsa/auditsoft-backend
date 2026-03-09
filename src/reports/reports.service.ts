@@ -1,13 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import PDFDocument from 'pdfkit';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { NotificationService } from '../notification/notification.service';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as nodemailer from 'nodemailer';
 
-import { IsArray, IsString, IsOptional, ValidateNested, IsIn } from 'class-validator';
+import { IsArray, IsString, IsOptional, ValidateNested, IsIn, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class DateRangeDto {
@@ -42,23 +43,63 @@ export class GenerateCustomReportDto {
   @Type(() => CustomReportFiltersDto)
   filters?: CustomReportFiltersDto;
 
+  @IsOptional()
+  auditIds?: number[]; // Specific audits to include
+
   @IsString()
   @IsIn(['pdf', 'csv'])
   format: 'pdf' | 'csv';
+
+  @IsOptional()
+  @IsString()
+  title?: string; // Report title
+
+  @IsOptional()
+  @IsString()
+  description?: string; // Report description
+
+  @IsOptional()
+  @IsBoolean()
+  saveAsTemplate?: boolean; // Whether to save as template
+
+  @IsOptional()
+  @IsString()
+  templateName?: string; // Name if saving as template
+
+  @IsOptional()
+  @IsBoolean()
+  saveReport?: boolean; // Whether to save the generated report
 }
 
 @Injectable()
 export class ReportsService {
+  private emailTransporter: nodemailer.Transporter;
+
   constructor(
     private prisma: PrismaService,
-    private notificationService: NotificationService
-  ) { }
+    private notificationService?: NotificationService
+  ) {
+    // Initialize email transporter
+    this.emailTransporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER || 'auditsoft@example.com',
+        pass: process.env.EMAIL_PASS || 'your-app-password'
+      }
+    });
+  }
 
   // ... existing methods ...
 
-  async generateCustomReport(dto: GenerateCustomReportDto, res: Response) {
+  async generateCustomReport(dto: GenerateCustomReportDto, res: Response, user?: any) {
     // 1. Fetch Data
     const where: any = {};
+    
+    // Handle specific audit IDs
+    if (dto.auditIds && dto.auditIds.length > 0) {
+      where.id = { in: dto.auditIds };
+    }
+    
     if (dto.filters?.auditType && dto.filters.auditType !== 'All') {
       where.auditType = dto.filters.auditType;
     }
@@ -77,15 +118,76 @@ export class ReportsService {
       include: {
         assignedManager: true,
         auditUniverse: true,
+        auditPrograms: {
+          include: {
+            findings: {
+              include: {
+                actionPlans: {
+                  include: {
+                    owner: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        findings: {
+          include: {
+            actionPlans: {
+              include: {
+                owner: true
+              }
+            }
+          }
+        }
       },
       orderBy: { createdAt: 'desc' },
     });
 
     // 2. Generate Output
+    let filePath: string | undefined;
+    let fileSize: number | undefined;
+    
     if (dto.format === 'csv') {
-      return this.generateCustomCSV(audits, dto.fields, res);
+      const csvData = await this.generateCustomCSVBuffer(audits, dto.fields);
+      if (dto.saveReport) {
+        filePath = await this.saveReportFile(csvData, 'csv', dto.title || 'Custom Report');
+        fileSize = csvData.length;
+      }
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=Custom_Report_${Date.now()}.csv`);
+      res.send(csvData);
     } else {
-      return this.generateCustomPDF(audits, dto.fields, res);
+      const pdfBuffer = await this.generateCustomPDFBuffer(audits, dto.fields, dto.title);
+      if (dto.saveReport) {
+        filePath = await this.saveReportFile(pdfBuffer, 'pdf', dto.title || 'Custom Report');
+        fileSize = pdfBuffer.length;
+      }
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=Custom_Report_${Date.now()}.pdf`);
+      res.send(pdfBuffer);
+    }
+
+    // 3. Save report configuration and/or template
+    if (dto.saveReport || dto.saveAsTemplate) {
+      await this.saveCustomReport({
+        title: dto.title || 'Custom Report',
+        description: dto.description,
+        reportData: JSON.stringify({
+          fields: dto.fields,
+          filters: dto.filters,
+          auditIds: dto.auditIds,
+          format: dto.format
+        }),
+        reportType: dto.saveAsTemplate ? 'template' : 'custom',
+        auditId: dto.auditIds?.[0] || null,
+        generatedBy: user?.id || user?.sub,
+        filePath,
+        fileType: dto.format,
+        fileSize,
+        isTemplate: dto.saveAsTemplate || false,
+        templateName: dto.templateName
+      });
     }
   }
 
@@ -103,6 +205,273 @@ export class ReportsService {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename=Custom_Report_${Date.now()}.csv`);
     res.send(csvContent);
+  }
+
+  private async generateCustomCSVBuffer(data: any[], fields: string[]): Promise<Buffer> {
+    const headers = fields.map(f => this.getFieldLabel(f)).join(',');
+    const rows = data.map(row => {
+      return fields.map(field => {
+        let val = this.getFieldValue(row, field);
+        return `"${String(val || '').replace(/"/g, '""')}"`;
+      }).join(',');
+    });
+
+    const csvContent = [headers, ...rows].join('\n');
+    return Buffer.from(csvContent, 'utf-8');
+  }
+
+  private async saveReportFile(buffer: Buffer, fileType: string, title: string): Promise<string> {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `${title.replace(/[^a-z0-9]/gi, '_')}_${timestamp}.${fileType}`;
+    const filePath = path.join(process.cwd(), 'uploads', 'reports', fileName);
+    
+    // Ensure directory exists
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    fs.writeFileSync(filePath, buffer);
+    return filePath;
+  }
+
+  async saveCustomReport(reportData: any): Promise<any> {
+    return this.prisma.customReport.create({
+      data: reportData
+    });
+  }
+
+  async getTabbedReportsList(user?: any) {
+    const [auditReports, customReports, templates] = await Promise.all([
+      this.getReportsList(user),
+      this.getCustomReports(user),
+      this.getCustomReportTemplates(user)
+    ]);
+
+    return {
+      auditReports: auditReports || [],
+      customReports: customReports || [],
+      templates: templates || []
+    };
+  }
+
+  async getCustomReports(user?: any) {
+    return this.prisma.customReport.findMany({
+      where: {
+        isTemplate: false,
+        ...(user?.role !== 'System Administrator' && { generatedBy: user?.id || user?.sub })
+      },
+      include: {
+        generator: {
+          select: { name: true, email: true }
+        },
+        audit: {
+          select: { auditName: true, status: true }
+        }
+      },
+      orderBy: { generatedAt: 'desc' }
+    });
+  }
+
+  async getCustomReportTemplates(user?: any) {
+    return this.prisma.customReport.findMany({
+      where: {
+        isTemplate: true,
+        ...(user?.role !== 'System Administrator' && { generatedBy: user?.id || user?.sub })
+      },
+      include: {
+        generator: {
+          select: { name: true, email: true }
+        },
+        audit: {
+          select: { auditName: true, status: true }
+        }
+      },
+      orderBy: { generatedAt: 'desc' }
+    });
+  }
+
+  async downloadCustomReport(id: number, res: Response) {
+    const report = await this.prisma.customReport.findUnique({
+      where: { id }
+    });
+
+    if (!report || !report.filePath) {
+      throw new NotFoundException('Custom report not found');
+    }
+
+    if (!fs.existsSync(report.filePath)) {
+      throw new NotFoundException('Report file not found on server');
+    }
+
+    const fileBuffer = fs.readFileSync(report.filePath);
+    
+    res.setHeader('Content-Type', this.getContentType(report.fileType || 'pdf'));
+    res.setHeader('Content-Disposition', `attachment; filename="${report.title}.${report.fileType || 'pdf'}"`);
+    res.setHeader('Content-Length', fileBuffer.length);
+    
+    res.send(fileBuffer);
+  }
+
+  private async generatePDFBuffer(auditId: number): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const buffers: Buffer[] = [];
+      const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+
+      doc.on('data', (chunk) => buffers.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', reject);
+
+      // Generate PDF content
+      this.generatePDFContent(doc, auditId);
+      doc.end();
+    });
+  }
+
+  private async generatePDFContent(doc: any, auditId: number) {
+    try {
+      const audit = await this.prisma.audit.findUnique({
+        where: { id: auditId },
+        include: {
+          assignedManager: {
+            select: { name: true, email: true }
+          },
+          auditPrograms: {
+            include: {
+              findings: {
+                include: {
+                  actionPlans: {
+                    include: {
+                      owner: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (!audit) {
+        throw new Error('Audit not found');
+      }
+
+      // PDF Content Generation
+      doc.fontSize(20).text('Audit Report', { align: 'center' });
+      doc.moveDown();
+      
+      doc.fontSize(14).text(`Audit Name: ${audit.auditName}`);
+      doc.text(`Status: ${audit.status}`);
+      doc.text(`Risk Level: ${audit.riskLevel || 'Not specified'}`);
+      doc.fontSize(14).text(`Manager: ${audit.assignedManager?.name || 'Not assigned'}`);
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`);
+      doc.moveDown();
+
+      doc.fontSize(16).text('Executive Summary', { underline: true });
+      doc.moveDown();
+      doc.fontSize(12).text('Audit objectives and scope information would be displayed here.');
+      doc.moveDown();
+
+      doc.fontSize(16).text('Audit Programs', { underline: true });
+      doc.moveDown();
+      
+      if (audit.auditPrograms && audit.auditPrograms.length > 0) {
+        audit.auditPrograms.forEach((program: any, index: number) => {
+          doc.fontSize(12).text(`${index + 1}. ${program.procedureName || `Program ${index + 1}`}`);
+          if (program.expectedOutcome) {
+            doc.text(`   Expected Outcome: ${program.expectedOutcome}`);
+          }
+          if (program.findings && program.findings.length > 0) {
+            doc.text(`   Findings: ${program.findings.length} identified`);
+          }
+          doc.moveDown(0.5);
+        });
+      } else {
+        doc.fontSize(12).text('No audit programs found.');
+      }
+
+    } catch (error) {
+      doc.fontSize(12).text('Error generating PDF content');
+      console.error('PDF generation error:', error);
+    }
+  }
+
+  async shareCustomReport(id: number, email: string, message?: string, user?: any) {
+    try {
+      const report = await this.prisma.customReport.findUnique({
+        where: { id },
+        include: {
+          generator: {
+            select: { name: true, email: true }
+          }
+        }
+      });
+
+      if (!report) {
+        throw new NotFoundException('Custom report not found');
+      }
+
+      // Create email content
+      const emailSubject = `Custom Report: ${report.title}`;
+      const emailBody = message || 
+        `Please find the attached custom report "${report.title}". This report contains important audit information that requires your attention.`;
+
+      // Send email with attachment
+      try {
+        const mailOptions = {
+          from: process.env.EMAIL_USER || 'auditsoft@example.com',
+          to: email,
+          subject: emailSubject,
+          text: emailBody,
+          attachments: [
+            {
+              filename: `Custom_Report_${report.title.replace(/[^a-z0-9]/gi, '_')}.pdf`,
+              content: report.filePath ? fs.readFileSync(report.filePath) : Buffer.alloc(0),
+              contentType: 'application/pdf'
+            }
+          ]
+        };
+
+        await this.emailTransporter.sendMail(mailOptions);
+        console.log('Custom report email sent successfully to:', email);
+      } catch (emailError) {
+        console.error('Failed to send custom report email:', emailError);
+        throw new InternalServerErrorException('Failed to send email');
+      }
+
+      // Create notification if notification service exists
+      if (this.notificationService) {
+        await this.notificationService.create({
+          userId: user.id || user.sub,
+          title: 'Custom Report Shared Successfully',
+          message: `The custom report "${report.title}" has been successfully shared with ${email}.`,
+          type: 'info',
+        });
+      }
+
+      return {
+        success: true,
+        message: `Custom report successfully shared with ${email}`,
+        details: {
+          reportTitle: report.title,
+          recipientEmail: email,
+          sharedAt: new Date(),
+          sharedBy: user?.name || user?.email || 'Chief Auditor'
+        }
+      };
+    } catch (error) {
+      console.error('Error sharing custom report:', error);
+      throw new InternalServerErrorException('Failed to share custom report');
+    }
+  }
+
+  private getContentType(fileType: string): string {
+    const types: { [key: string]: string } = {
+      'pdf': 'application/pdf',
+      'csv': 'text/csv',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    };
+    return types[fileType] || 'application/octet-stream';
   }
 
   private async generateCustomPDF(data: any[], fields: string[], res: Response) {
@@ -161,6 +530,50 @@ export class ReportsService {
       
       doc.on('error', (error) => {
         reject(error);
+      });
+
+      doc.end();
+    });
+  }
+
+  private async generateCustomPDFBuffer(data: any[], fields: string[], title?: string): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const buffers: Buffer[] = [];
+      const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+
+      doc.on('data', (chunk) => buffers.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', reject);
+
+      // Title
+      doc.fontSize(18).text(title || 'Custom Audit Report', { align: 'center' });
+      doc.moveDown();
+
+      // Table headers
+      const headers = fields.map(f => this.getFieldLabel(f));
+      const tableTop = doc.y;
+      const itemHeight = 20;
+      const tableWidth = doc.page.width - 60;
+      const columnWidth = tableWidth / headers.length;
+
+      // Draw headers
+      doc.fontSize(10).font('Helvetica-Bold');
+      headers.forEach((header, i) => {
+        doc.text(header, 30 + i * columnWidth, tableTop, { width: columnWidth - 5 });
+      });
+
+      // Draw data
+      doc.fontSize(9).font('Helvetica');
+      data.forEach((row, rowIndex) => {
+        const y = tableTop + itemHeight + (rowIndex * itemHeight);
+        if (y > doc.page.height - 50) {
+          doc.addPage();
+        }
+        
+        fields.forEach((field, colIndex) => {
+          const value = this.getFieldValue(row, field);
+          doc.text(value, 30 + colIndex * columnWidth, y, { width: columnWidth - 5 });
+        });
       });
 
       doc.end();
@@ -284,10 +697,17 @@ export class ReportsService {
 
   async getDashboardStats() {
     // Reusing similar logic or expanding for general dashboard
-    const [audits, findings, users] = await Promise.all([
+    const [audits, findings, users, reports] = await Promise.all([
       this.prisma.audit.count(),
-      this.prisma.finding.count({ where: { status: 'Open' } }),
+      this.prisma.finding.count({ 
+        where: { 
+          status: { 
+            notIn: ['Closed', 'Remediated'] 
+          } 
+        } 
+      }),
       this.prisma.user.count(),
+      this.prisma.report.count(),
     ]);
 
     // Audit Planning Trend (Last 6 months)
@@ -325,18 +745,15 @@ export class ReportsService {
       totalAudits: audits,
       openFindings: findings,
       activeUsers: users,
+      totalReports: reports,
       auditTrend: trendData,
       auditStatusDistribution: auditStatus.map(s => ({ name: s.status, value: s._count.status }))
     };
   }
 
   async getReportsList(user: any) {
-    // Audit Managers see reports for audits they manage or all if they are generic managers (depending on business rule, assuming all for now or restricted)
-    // Chief Auditor sees all.
-    // For simplicity based on prompt "available to audit manager and the Chief Auditor", we return all reports for closed audits.
-    // We can add filtering if needed later.
-
-    const reports = await this.prisma.report.findMany({
+    // Get all reports and categorize them into tabs
+    const auditReports = await this.prisma.report.findMany({
       where: {
         audit: {
           status: { in: ['Finalized', 'Closed'] }
@@ -355,7 +772,8 @@ export class ReportsService {
       }
     });
 
-    return reports.map(report => ({
+    // Transform audit reports
+    const transformedAuditReports = auditReports.map(report => ({
       id: report.id,
       auditId: report.auditId,
       title: report.title,
@@ -364,8 +782,60 @@ export class ReportsService {
       generatedBy: report.generator.name,
       generatedAt: report.generatedAt,
       fileUrl: report.fileUrl,
-      fileType: report.fileType
+      fileType: report.fileType,
+      type: 'audit_report'
     }));
+
+    // Mock custom reports (would come from a SavedReport table in production)
+    const customReports = [
+      {
+        id: 'custom_1',
+        title: 'Quarterly Risk Summary',
+        description: 'Custom report template for quarterly risk assessment',
+        generatedAt: new Date('2024-01-15'),
+        type: 'custom_report',
+        fields: ['riskLevel', 'auditName', 'status', 'assignedManager']
+      },
+      {
+        id: 'custom_2', 
+        title: 'Audit Progress Dashboard',
+        description: 'Real-time audit progress tracking template',
+        generatedAt: new Date('2024-02-20'),
+        type: 'custom_report',
+        fields: ['auditName', 'status', 'startDate', 'endDate', 'completion']
+      }
+    ];
+
+    // Mock report templates
+    const reportTemplates = [
+      {
+        id: 'template_1',
+        name: 'Standard Audit Report Template',
+        description: 'Comprehensive audit report with all sections',
+        category: 'audit',
+        fields: ['auditPlan', 'auditPrograms', 'findings', 'actionPlans', 'executiveSummary']
+      },
+      {
+        id: 'template_2',
+        name: 'Executive Summary Template',
+        description: 'Brief executive summary report',
+        category: 'executive',
+        fields: ['auditName', 'status', 'keyFindings', 'recommendations']
+      },
+      {
+        id: 'template_3',
+        name: 'Financial Audit Template',
+        description: 'Specialized template for financial audits',
+        category: 'financial',
+        fields: ['financialData', 'compliance', 'riskAssessment', 'findings']
+      }
+    ];
+
+    return {
+      auditReports: transformedAuditReports,
+      customReports,
+      reportTemplates
+    };
   }
 
   async getAuditReportData(auditId: number) {
@@ -374,11 +844,7 @@ export class ReportsService {
       include: {
         assignedManager: true,
         assignedAuditors: true,
-        auditUniverse: {
-          include: {
-            owner: true
-          }
-        },
+        auditUniverse: true,
         auditPrograms: {
           include: {
             findings: {
@@ -388,17 +854,6 @@ export class ReportsService {
                     owner: true
                   }
                 }
-              }
-            },
-            evidence: {
-              include: {
-                uploadedBy: true,
-                versions: true
-              }
-            },
-            controlMappings: {
-              include: {
-                framework: true
               }
             }
           }
@@ -563,14 +1018,112 @@ export class ReportsService {
     currentY = doc.y + 15;
 
     // ──────────────────────────────────────────────────────────────
-    // SECTION 2 – GENERAL INFORMATION
+    // SECTION 2 – AUDIT PLAN DETAILS
     // ──────────────────────────────────────────────────────────────
-    checkPageBreak(80);
-    this.drawHeading(doc, '2. General Information');
+    checkPageBreak(120);
+    this.drawHeading(doc, '2. Audit Plan Details');
     currentY = doc.y + 10;
     doc.fontSize(12);
-    doc.text(`Audit Type:      ${audit.auditType}`);
+    
+    // Basic Audit Information
+    doc.font('Helvetica-Bold').text('Basic Information:', { underline: true });
     currentY = doc.y + 5;
+    doc.font('Helvetica').fontSize(10);
+    doc.text(`Audit Name:        ${audit.auditName}`);
+    currentY = doc.y + 3;
+    doc.text(`Audit Type:        ${audit.auditType}`);
+    currentY = doc.y + 3;
+    doc.text(`Status:            ${audit.status}`);
+    currentY = doc.y + 3;
+    doc.text(`Audit Period:      ${audit.startDate ? new Date(audit.startDate).toLocaleDateString() : 'N/A'} - ${audit.endDate ? new Date(audit.endDate).toLocaleDateString() : 'N/A'}`);
+    currentY = doc.y + 10;
+    
+    // Strategic Planning Fields
+    if (audit.riskScore !== undefined || audit.riskLevel || audit.priority || audit.quarter || audit.year) {
+      doc.font('Helvetica-Bold').text('Strategic Planning:', { underline: true });
+      currentY = doc.y + 5;
+      doc.font('Helvetica').fontSize(10);
+      if (audit.riskScore !== undefined) {
+        doc.text(`Risk Score:        ${audit.riskScore}`);
+        currentY = doc.y + 3;
+      }
+      if (audit.riskLevel) {
+        doc.text(`Risk Level:        ${audit.riskLevel}`);
+        currentY = doc.y + 3;
+      }
+      if (audit.priority) {
+        doc.text(`Priority:          ${audit.priority}`);
+        currentY = doc.y + 3;
+      }
+      if (audit.quarter) {
+        doc.text(`Quarter:           ${audit.quarter}`);
+        currentY = doc.y + 3;
+      }
+      if (audit.year) {
+        doc.text(`Year:              ${audit.year}`);
+        currentY = doc.y + 3;
+      }
+      currentY = doc.y + 10;
+    }
+    
+    // Resource Allocation
+    if (audit.resourceHours !== undefined || audit.budgetAllocation !== undefined) {
+      doc.font('Helvetica-Bold').text('Resource Allocation:', { underline: true });
+      currentY = doc.y + 5;
+      doc.font('Helvetica').fontSize(10);
+      if (audit.resourceHours !== undefined) {
+        doc.text(`Resource Hours:    ${audit.resourceHours}`);
+        currentY = doc.y + 3;
+      }
+      if (audit.budgetAllocation !== undefined) {
+        doc.text(`Budget Allocation: $${audit.budgetAllocation.toLocaleString()}`);
+        currentY = doc.y + 3;
+      }
+      currentY = doc.y + 10;
+    }
+    
+    // Executive Approval
+    if (audit.executiveApproval !== undefined || audit.executiveApprovedAt || audit.justification) {
+      doc.font('Helvetica-Bold').text('Executive Approval:', { underline: true });
+      currentY = doc.y + 5;
+      doc.font('Helvetica').fontSize(10);
+      doc.text(`Approval Status:   ${audit.executiveApproval ? 'Approved' : 'Pending'}`);
+      currentY = doc.y + 3;
+      if (audit.executiveApprovedAt) {
+        doc.text(`Approved Date:     ${new Date(audit.executiveApprovedAt).toLocaleDateString()}`);
+        currentY = doc.y + 3;
+      }
+      if (audit.executiveApprover) {
+        doc.text(`Approved By:       ${audit.executiveApprover.name}`);
+        currentY = doc.y + 3;
+      }
+      if (audit.justification) {
+        doc.text(`Justification:     ${audit.justification}`);
+        currentY = doc.y + 3;
+      }
+      currentY = doc.y + 10;
+    }
+    
+    // Team Assignment
+    doc.font('Helvetica-Bold').text('Team Assignment:', { underline: true });
+    currentY = doc.y + 5;
+    doc.font('Helvetica').fontSize(10);
+    doc.text(`Audit Manager:     ${audit.assignedManager?.name || 'Unassigned'}`);
+    currentY = doc.y + 3;
+    if (audit.assignedManager?.email) {
+      doc.text(`Manager Email:     ${audit.assignedManager.email}`);
+      currentY = doc.y + 3;
+    }
+    doc.text(`Assigned Auditors: ${audit.assignedAuditors?.map(a => a.name).join(', ') || 'Unassigned'}`);
+    currentY = doc.y + 10;
+
+    // ──────────────────────────────────────────────────────────────
+    // SECTION 3 – GENERAL INFORMATION
+    // ──────────────────────────────────────────────────────────────
+    checkPageBreak(80);
+    this.drawHeading(doc, '3. General Information');
+    currentY = doc.y + 10;
+    doc.fontSize(12);
     doc.text(`Business Entity: ${audit.auditUniverse?.entityName || 'N/A'} (${audit.auditUniverse?.entityType || 'N/A'})`);
     currentY = doc.y + 5;
     if (audit.auditUniverse?.owner) {
@@ -590,31 +1143,92 @@ export class ReportsService {
     }
 
     // ──────────────────────────────────────────────────────────────
-    // SECTION 3 – AUDIT PROGRAMS & REVIEWER COMMENTS
+    // SECTION 4 – AUDIT PROGRAMS & REVIEWER COMMENTS
     // ──────────────────────────────────────────────────────────────
     checkPageBreak(100);
-    this.drawHeading(doc, '3. Audit Programs');
+    this.drawHeading(doc, '4. Audit Programs');
     currentY = doc.y + 10;
     if (audit.auditPrograms && audit.auditPrograms.length > 0) {
       audit.auditPrograms.forEach((program, index) => {
-        checkPageBreak(80);
+        checkPageBreak(150);
         // Sub-heading for each program (bold, underlined via Helvetica-Bold + underline)
         doc.font('Helvetica-Bold').fontSize(12).text(`${index + 1}. ${program.procedureName}`, { underline: true });
         currentY = doc.y + 5;
         doc.font('Helvetica').fontSize(10);
 
+        // Basic Program Information
         doc.text(`   Control Reference:     ${program.controlReference || 'N/A'}`);
         currentY = doc.y + 3;
         doc.text(`   Expected Outcome:      ${program.expectedOutcome || 'N/A'}`);
         currentY = doc.y + 3;
         doc.text(`   Actual Result:         ${program.actualResult || 'In Progress'}`);
-        currentY = doc.y + 5;
-
-        // Reviewer comment
-        if (program.reviewerComment) {
-          doc.font('Helvetica-Bold').text('   Reviewer Comment:', { continued: false });
-          doc.font('Helvetica').fillColor('#1e3a5f').text(`   "${program.reviewerComment}"`).fillColor('#000000');
+        currentY = doc.y + 3;
+        
+        // Testing Methodology
+        if (program.testMethod || program.samplingApproach || program.sampleSize !== undefined) {
+          doc.font('Helvetica-Bold').text('   Testing Methodology:', { continued: false });
+          currentY = doc.y + 3;
+          doc.font('Helvetica');
+          if (program.testMethod) {
+            doc.text(`     Test Method:         ${program.testMethod}`);
+            currentY = doc.y + 3;
+          }
+          if (program.samplingApproach) {
+            doc.text(`     Sampling Approach:   ${program.samplingApproach}`);
+            currentY = doc.y + 3;
+          }
+          if (program.sampleSize !== undefined) {
+            doc.text(`     Sample Size:         ${program.sampleSize}`);
+            currentY = doc.y + 3;
+          }
+        }
+        
+        // Documentation Requirements
+        if (program.documentationReq || program.evidenceRequired) {
+          doc.font('Helvetica-Bold').text('   Documentation Requirements:', { continued: false });
+          currentY = doc.y + 3;
+          doc.font('Helvetica');
+          if (program.documentationReq) {
+            doc.text(`     Documentation:       ${program.documentationReq}`);
+            currentY = doc.y + 3;
+          }
+          if (program.evidenceRequired) {
+            doc.text(`     Evidence Required:   ${program.evidenceRequired}`);
+            currentY = doc.y + 3;
+          }
+        }
+        
+        // Step-by-Step Procedure
+        if (program.stepByStepProcedure) {
+          doc.font('Helvetica-Bold').text('   Step-by-Step Procedure:', { continued: false });
+          currentY = doc.y + 3;
+          doc.font('Helvetica').text(`     ${program.stepByStepProcedure}`);
           currentY = doc.y + 5;
+        }
+        
+        // Confidence Level and Materiality
+        if (program.confidenceLevel !== undefined || program.materialityThreshold !== undefined) {
+          doc.font('Helvetica-Bold').text('   Quality Metrics:', { continued: false });
+          currentY = doc.y + 3;
+          doc.font('Helvetica');
+          if (program.confidenceLevel !== undefined) {
+            doc.text(`     Confidence Level:    ${(program.confidenceLevel * 100).toFixed(1)}%`);
+            currentY = doc.y + 3;
+          }
+          if (program.materialityThreshold !== undefined) {
+            doc.text(`     Materiality Threshold: $${program.materialityThreshold.toLocaleString()}`);
+            currentY = doc.y + 3;
+          }
+        }
+
+        // Reviewer comment - highlighted
+        if (program.reviewerComment) {
+          currentY = doc.y + 5;
+          doc.font('Helvetica-Bold').fillColor('#1e3a5f').text('   Reviewer Comments:', { continued: false });
+          currentY = doc.y + 3;
+          doc.font('Helvetica').fillColor('#2563eb').text(`   "${program.reviewerComment}"`);
+          currentY = doc.y + 5;
+          doc.fillColor('#000000'); // Reset color
         }
 
         // Control Mappings
@@ -624,7 +1238,7 @@ export class ReportsService {
           doc.font('Helvetica');
           program.controlMappings.forEach((mapping: any) => {
             const fwName = mapping.framework?.frameworkName || 'Unnamed Framework';
-            doc.text(`     - ${fwName} : ${mapping.coverageStatus}`);
+            doc.text(`     - ${fwName} : ${mapping.coverageStatus || 'Mapped'}`);
             currentY = doc.y + 3;
           });
         } else {
@@ -658,10 +1272,10 @@ export class ReportsService {
     }
 
     // ──────────────────────────────────────────────────────────────
-    // SECTION 4 – DETAILED FINDINGS
+    // SECTION 5 – DETAILED FINDINGS
     // ──────────────────────────────────────────────────────────────
     checkPageBreak(100);
-    this.drawHeading(doc, '4. Detailed Findings');
+    this.drawHeading(doc, '5. Detailed Findings');
     currentY = doc.y + 10;
     if (audit.findings && audit.findings.length > 0) {
       audit.findings.forEach((finding, index) => {
@@ -710,10 +1324,10 @@ export class ReportsService {
     }
 
     // ──────────────────────────────────────────────────────────────
-    // SECTION 5 – ACTION PLANS SUMMARY
+    // SECTION 6 – ACTION PLANS SUMMARY
     // ──────────────────────────────────────────────────────────────
     checkPageBreak(120);
-    this.drawHeading(doc, '5. Action Plans Summary');
+    this.drawHeading(doc, '6. Action Plans Summary');
     currentY = doc.y + 10;
     const actionPlansSummary = audit.findings?.flatMap(f => f.actionPlans || []) || [];
     if (actionPlansSummary.length > 0) {
@@ -878,13 +1492,15 @@ export class ReportsService {
     const uniqueRecipients = [...new Set(recipients)];
 
     for (const userId of uniqueRecipients) {
-      await this.notificationService.create({
-        userId,
-        title: 'Report Generated',
-        message: `New Audit Report generated for ${audit.auditName}. You can download it now.`,
-        type: 'REPORT_GENERATED',
-        link: `/reports/audit/${auditId}/pdf`
-      });
+      if (this.notificationService) {
+        await this.notificationService.create({
+          userId,
+          title: 'Report Generated',
+          message: `New Audit Report generated for ${audit.auditName}. You can download it now.`,
+          type: 'REPORT_GENERATED',
+          link: `/reports/audit/${auditId}/pdf`
+        });
+      }
     }
   }
 
@@ -922,13 +1538,15 @@ export class ReportsService {
     // Notify Manager (review-only) and Chief Auditor (download)
     const recipientsReview = audit.assignedManagerId ? [audit.assignedManagerId] : [];
     for (const userId of recipientsReview) {
-      await this.notificationService.create({
-        userId,
-        title: 'Audit Report Ready for Review',
-        message: `Audit report for '${audit.auditName}' is ready. View it now.`,
-        type: 'REPORT_READY',
-        link: `/reports/audit/${auditId}/preview`,
-      });
+      if (this.notificationService) {
+        await this.notificationService.create({
+          userId,
+          title: 'Audit Report Ready for Review',
+          message: `Audit report for '${audit.auditName}' is ready. View it now.`,
+          type: 'REPORT_READY',
+          link: `/reports/audit/${auditId}/preview`,
+        });
+      }
     }
     // Notify Chief Auditors
     const chiefAuditors = await this.prisma.user.findMany({
@@ -943,13 +1561,15 @@ export class ReportsService {
       }
     });
     for (const chiefAuditor of chiefAuditors) {
-      await this.notificationService.create({
-        userId: chiefAuditor.id,
-        title: 'Audit Report Ready',
-        message: `Audit report for '${audit.auditName}' is ready to download.`,
-        type: 'REPORT_READY',
-        link: `/reports/audit/${auditId}/download`,
-      });
+      if (this.notificationService) {
+        await this.notificationService.create({
+          userId: chiefAuditor.id,
+          title: 'Audit Report Ready',
+          message: `Audit report for '${audit.auditName}' is ready to download.`,
+          type: 'REPORT_READY',
+          link: `/reports/audit/${auditId}/download`,
+        });
+      }
     }
 
     return filePath;
@@ -974,27 +1594,275 @@ export class ReportsService {
   async generateWord(auditId: number, res: Response) {
     const audit = await this.getAuditReportData(auditId);
 
-    const doc = new Document({
-      sections: [{
-        properties: {},
-        children: [
+    const children: any[] = [
+      // Title Section
+      new Paragraph({
+        text: `Audit Report: ${audit.auditName}`,
+        heading: HeadingLevel.TITLE,
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({
+        text: `Generated: ${new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({ text: '' }), // Spacer
+
+      // Executive Summary
+      new Paragraph({
+        text: '1. Executive Summary',
+        heading: HeadingLevel.HEADING_1,
+      }),
+      new Paragraph({
+        text: `Audit Status: ${audit.status}`,
+      }),
+      new Paragraph({
+        text: `Audit Period: ${audit.startDate ? new Date(audit.startDate).toLocaleDateString() : 'N/A'} - ${audit.endDate ? new Date(audit.endDate).toLocaleDateString() : 'N/A'}`,
+      }),
+      new Paragraph({
+        text: `Audit Manager: ${audit.assignedManager?.name || 'Unassigned'}`,
+      }),
+      new Paragraph({
+        text: `Assigned Auditors: ${audit.assignedAuditors?.map(a => a.name).join(', ') || 'Unassigned'}`,
+      }),
+      new Paragraph({
+        text: `Programs Completed: ${audit.auditPrograms?.filter(p => p.actualResult === 'Completed').length || 0} of ${audit.auditPrograms?.length || 0}`,
+      }),
+      new Paragraph({
+        text: `Findings Identified: ${audit.findings?.length || 0}`,
+      }),
+      new Paragraph({ text: '' }),
+
+      // Audit Plan Details
+      new Paragraph({
+        text: '2. Audit Plan Details',
+        heading: HeadingLevel.HEADING_1,
+      }),
+      new Paragraph({
+        text: 'Basic Information',
+        heading: HeadingLevel.HEADING_2,
+      }),
+      new Paragraph({
+        text: `Audit Name: ${audit.auditName}`,
+      }),
+      new Paragraph({
+        text: `Audit Type: ${audit.auditType}`,
+      }),
+      new Paragraph({
+        text: `Status: ${audit.status}`,
+      }),
+    ];
+
+    // Add strategic planning if available
+    if (audit.riskScore !== undefined || audit.riskLevel || audit.priority) {
+      children.push(
+        new Paragraph({
+          text: 'Strategic Planning',
+          heading: HeadingLevel.HEADING_2,
+        })
+      );
+      if (audit.riskScore !== undefined) {
+        children.push(new Paragraph({ text: `Risk Score: ${audit.riskScore}` }));
+      }
+      if (audit.riskLevel) {
+        children.push(new Paragraph({ text: `Risk Level: ${audit.riskLevel}` }));
+      }
+      if (audit.priority) {
+        children.push(new Paragraph({ text: `Priority: ${audit.priority}` }));
+      }
+    }
+
+    // Add resource allocation if available
+    if (audit.resourceHours !== undefined || audit.budgetAllocation !== undefined) {
+      children.push(
+        new Paragraph({
+          text: 'Resource Allocation',
+          heading: HeadingLevel.HEADING_2,
+        })
+      );
+      if (audit.resourceHours !== undefined) {
+        children.push(new Paragraph({ text: `Resource Hours: ${audit.resourceHours}` }));
+      }
+      if (audit.budgetAllocation !== undefined && audit.budgetAllocation !== null) {
+        children.push(new Paragraph({ text: `Budget Allocation: $${audit.budgetAllocation.toLocaleString()}` }));
+      }
+    }
+
+    // Add executive approval if available
+    if (audit.executiveApproval !== undefined || audit.executiveApprovedAt) {
+      children.push(
+        new Paragraph({
+          text: 'Executive Approval',
+          heading: HeadingLevel.HEADING_2,
+        }),
+        new Paragraph({
+          text: `Approval Status: ${audit.executiveApproval ? 'Approved' : 'Pending'}`,
+        })
+      );
+      if (audit.executiveApprovedAt) {
+        children.push(new Paragraph({ text: `Approved Date: ${new Date(audit.executiveApprovedAt).toLocaleDateString()}` }));
+      }
+      if (audit.executiveApprovedById && (audit as any).executiveApprover) {
+        children.push(new Paragraph({ text: `Approved By: ${(audit as any).executiveApprover.name}` }));
+      }
+      if (audit.justification) {
+        children.push(new Paragraph({ text: `Justification: ${audit.justification}` }));
+      }
+    }
+
+    children.push(new Paragraph({ text: '' }));
+
+    // General Information
+    children.push(
+      new Paragraph({
+        text: '3. General Information',
+        heading: HeadingLevel.HEADING_1,
+      }),
+      new Paragraph({
+        text: `Business Entity: ${audit.auditUniverse?.entityName || 'N/A'} (${audit.auditUniverse?.entityType || 'N/A'})`,
+      })
+    );
+
+    if (audit.chiefAuditorComments) {
+      children.push(
+        new Paragraph({
+          text: 'Chief Auditor Comments',
+          heading: HeadingLevel.HEADING_2,
+        }),
+        new Paragraph({
+          text: audit.chiefAuditorComments,
+        })
+      );
+    }
+
+    children.push(new Paragraph({ text: '' }));
+
+    // Audit Programs
+    children.push(
+      new Paragraph({
+        text: '4. Audit Programs',
+        heading: HeadingLevel.HEADING_1,
+      })
+    );
+
+    if (audit.auditPrograms && audit.auditPrograms.length > 0) {
+      audit.auditPrograms.forEach((program, index) => {
+        children.push(
           new Paragraph({
-            text: `Audit Report: ${audit.auditName}`,
-            heading: HeadingLevel.TITLE,
-            alignment: AlignmentType.CENTER,
-          }),
-          new Paragraph({
-            text: `Status: ${audit.status}`,
+            text: `${index + 1}. ${program.procedureName}`,
             heading: HeadingLevel.HEADING_2,
           }),
           new Paragraph({
-            text: `Manager: ${audit.assignedManager?.name || 'Unassigned'}`,
+            text: `Control Reference: ${program.controlReference || 'N/A'}`,
           }),
           new Paragraph({
-            text: `Findings Count: ${audit.findings.length}`,
+            text: `Expected Outcome: ${program.expectedOutcome || 'N/A'}`,
           }),
-          // Add more sections as needed
-        ],
+          new Paragraph({
+            text: `Actual Result: ${program.actualResult || 'In Progress'}`,
+          })
+        );
+
+        if (program.testMethod) {
+          children.push(new Paragraph({ text: `Test Method: ${program.testMethod}` }));
+        }
+        if (program.samplingApproach) {
+          children.push(new Paragraph({ text: `Sampling Approach: ${program.samplingApproach}` }));
+        }
+        if (program.sampleSize !== undefined) {
+          children.push(new Paragraph({ text: `Sample Size: ${program.sampleSize}` }));
+        }
+        if (program.confidenceLevel !== undefined && program.confidenceLevel !== null) {
+          children.push(new Paragraph({ text: `Confidence Level: ${(program.confidenceLevel * 100).toFixed(1)}%` }));
+        }
+        if (program.materialityThreshold !== undefined && program.materialityThreshold !== null) {
+          children.push(new Paragraph({ text: `Materiality Threshold: $${program.materialityThreshold.toLocaleString()}` }));
+        }
+        if (program.documentationReq) {
+          children.push(new Paragraph({ text: `Documentation Requirements: ${program.documentationReq}` }));
+        }
+        if (program.evidenceRequired) {
+          children.push(new Paragraph({ text: `Evidence Required: ${program.evidenceRequired}` }));
+        }
+        if (program.stepByStepProcedure) {
+          children.push(new Paragraph({ text: `Step-by-Step Procedure: ${program.stepByStepProcedure}` }));
+        }
+        if (program.reviewerComment) {
+          children.push(
+            new Paragraph({
+              text: 'Reviewer Comments:',
+              heading: HeadingLevel.HEADING_3,
+            }),
+            new Paragraph({
+              text: program.reviewerComment,
+            })
+          );
+        }
+        children.push(new Paragraph({ text: '' }));
+      });
+    } else {
+      children.push(new Paragraph({ text: 'No audit programs defined.' }));
+    }
+
+    // Findings
+    children.push(
+      new Paragraph({
+        text: '5. Detailed Findings',
+        heading: HeadingLevel.HEADING_1,
+      })
+    );
+
+    if (audit.findings && audit.findings.length > 0) {
+      audit.findings.forEach((finding, index) => {
+        children.push(
+          new Paragraph({
+            text: `${index + 1}. ${finding.description} (${finding.severity})`,
+            heading: HeadingLevel.HEADING_2,
+          }),
+          new Paragraph({
+            text: `Status: ${finding.status}`,
+          })
+        );
+
+        if (finding.rootCause) {
+          children.push(new Paragraph({ text: `Root Cause: ${finding.rootCause}` }));
+        }
+
+        if (finding.actionPlans && finding.actionPlans.length > 0) {
+          finding.actionPlans.forEach((plan, planIndex) => {
+            children.push(
+              new Paragraph({
+                text: `Action Plan ${planIndex + 1}:`,
+                heading: HeadingLevel.HEADING_3,
+              }),
+              new Paragraph({
+                text: `Description: ${plan.description}`,
+              })
+            );
+
+            if (plan.dueDate) {
+              children.push(new Paragraph({ text: `Due Date: ${new Date(plan.dueDate).toLocaleDateString()}` }));
+            }
+            children.push(
+              new Paragraph({
+                text: `Status: ${plan.status}`,
+              })
+            );
+
+            if (plan.owner) {
+              children.push(new Paragraph({ text: `Assigned To: ${plan.owner.name}` }));
+            }
+          });
+        }
+        children.push(new Paragraph({ text: '' }));
+      });
+    } else {
+      children.push(new Paragraph({ text: 'No findings identified.' }));
+    }
+
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: children,
       }],
     });
 
@@ -1014,13 +1882,15 @@ export class ReportsService {
     const uniqueRecipients = [...new Set(recipients)];
 
     for (const userId of uniqueRecipients) {
-      await this.notificationService.create({
-        userId,
-        title: 'Report Generated',
-        message: `New Audit Report generated for ${audit.auditName}. You can download it now.`,
-        type: 'REPORT_GENERATED',
-        link: `/reports/audit/${auditId}/docx` // Or a frontend link to view
-      });
+      if (this.notificationService) {
+        await this.notificationService.create({
+          userId,
+          title: 'Report Generated',
+          message: `New Audit Report generated for ${audit.auditName}. You can download it now.`,
+          type: 'REPORT_GENERATED',
+          link: `/reports/audit/${auditId}/docx` // Or a frontend link to view
+        });
+      }
     }
   }
 
@@ -1091,44 +1961,46 @@ export class ReportsService {
     });
 
     for (const chiefAuditor of chiefAuditors) {
-      await this.notificationService.create({
-        userId: chiefAuditor.id,
-        title: 'Audit Report Pending Approval',
-        message: `The audit report for '${audit.auditName}' has been saved by ${user.name || 'a Manager'} and is awaiting your approval.`,
-        type: 'action_required',
-        link: `/reports/audit/${auditId}/preview`,
-      });
+      if (this.notificationService) {
+        await this.notificationService.create({
+          userId: chiefAuditor.id,
+          title: 'Audit Report Pending Approval',
+          message: `The audit report for '${audit.auditName}' has been saved by ${user.name || 'a Manager'} and is awaiting your approval.`,
+          type: 'action_required',
+          link: `/reports/audit/${auditId}/preview`,
+        });
+      }
     }
 
     return {
       success: true,
       message: 'Report saved successfully. Chief Auditor has been notified for approval.',
-      report,
+      report
     };
   }
 
   async shareAuditReport(auditId: number, email: string, message?: string, user?: any) {
-    // Get audit details
-    const audit = await this.prisma.audit.findUnique({
-      where: { id: auditId },
-      include: {
-        assignedManager: {
-          select: { name: true, email: true }
-        }
-      }
-    });
-
-    if (!audit) {
-      throw new NotFoundException('Audit not found');
-    }
-
-    // Check if audit is in a status that allows sharing
-    if (!['Completed', 'Approved', 'Finalized'].includes(audit.status)) {
-      throw new Error('Only completed, approved, or finalized audits can be shared');
-    }
-
     try {
-      // Generate the PDF report
+      console.log('=== SHARE AUDIT REPORT DEBUG ===');
+      console.log('Audit ID:', auditId);
+      console.log('Email:', email);
+      console.log('User:', user);
+      
+      // Get audit details
+      const audit = await this.prisma.audit.findUnique({
+        where: { id: auditId },
+        include: {
+          assignedManager: {
+            select: { name: true, email: true }
+          }
+        }
+      });
+
+      if (!audit) {
+        throw new NotFoundException('Audit not found');
+      }
+
+      console.log('Generating PDF...');
       const pdfBuffer = await this.generatePDFBuffer(auditId);
       
       // Create email content
@@ -1136,55 +2008,31 @@ export class ReportsService {
       const emailBody = message || 
         `Please find the attached audit report for "${audit.auditName}". This report contains important audit findings and recommendations that require your attention.`;
 
-      // In a real implementation, you would use an email service like SendGrid, Nodemailer, etc.
-      // For now, we'll simulate the email sending and log the details
-      console.log('=== EMAIL SHARING DETAILS ===');
-      console.log('To:', email);
-      console.log('Subject:', emailSubject);
-      console.log('Body:', emailBody);
-      console.log('Attachment:', `Audit_Report_${auditId}.pdf (${pdfBuffer.length} bytes)`);
-      console.log('Shared by:', user?.name || user?.email || 'Chief Auditor');
-      console.log('==============================');
+      // Send email with attachment
+      try {
+        const mailOptions = {
+          from: process.env.EMAIL_USER || 'auditsoft@example.com',
+          to: email,
+          subject: emailSubject,
+          text: emailBody,
+          attachments: [
+            {
+              filename: `Audit_Report_${audit.auditName.replace(/[^a-z0-9]/gi, '_')}.pdf`,
+              content: pdfBuffer,
+              contentType: 'application/pdf'
+            }
+          ]
+        };
 
-      // TODO: Implement actual email sending logic
-      // Example with nodemailer:
-      /*
-      const transporter = nodemailer.createTransport({
-        service: 'gmail', // or your email service
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS
-        }
-      });
+        await this.emailTransporter.sendMail(mailOptions);
+        console.log('Email sent successfully to:', email);
+      } catch (emailError) {
+        console.error('Failed to send email:', emailError);
+        throw new InternalServerErrorException('Failed to send email');
+      }
 
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: emailSubject,
-        text: emailBody,
-        attachments: [
-          {
-            filename: `Audit_Report_${audit.auditName.replace(/[^a-z0-9]/gi, '_')}.pdf`,
-            content: pdfBuffer,
-            contentType: 'application/pdf'
-          }
-        ]
-      });
-      */
-
-      // Log the sharing activity
-      await this.prisma.auditLog.create({
-        data: {
-          action: 'REPORT_SHARED',
-          entityType: 'AUDIT',
-          entityId: auditId,
-          userId: user?.id || user?.sub,
-          timestamp: new Date()
-        }
-      });
-
-      // Create notification for the user who shared
-      if (user?.id || user?.sub) {
+      // Create notification if notification service exists
+      if (this.notificationService && user?.id) {
         await this.notificationService.create({
           userId: user.id || user.sub,
           title: 'Audit Report Shared Successfully',
@@ -1203,82 +2051,9 @@ export class ReportsService {
           sharedBy: user?.name || user?.email || 'Chief Auditor'
         }
       };
-
     } catch (error) {
       console.error('Error sharing audit report:', error);
-      throw new Error(`Failed to share audit report: ${error.message}`);
-    }
-  }
-
-  private async generatePDFBuffer(auditId: number): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      const doc = new PDFDocument();
-      
-      doc.on('data', (chunk) => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
-
-      // Generate PDF content (simplified version)
-      this.generatePDFContent(doc, auditId);
-      doc.end();
-    });
-  }
-
-  private async generatePDFContent(doc: any, auditId: number) {
-    try {
-      const audit = await this.prisma.audit.findUnique({
-        where: { id: auditId },
-        include: {
-          assignedManager: {
-            select: { name: true, email: true }
-          },
-          auditPrograms: {
-            include: {
-              workpaper: true
-            }
-          }
-        }
-      });
-
-      if (!audit) {
-        throw new Error('Audit not found');
-      }
-
-      // PDF Content Generation
-      doc.fontSize(20).text('Audit Report', { align: 'center' });
-      doc.moveDown();
-      
-      doc.fontSize(14).text(`Audit Name: ${audit.auditName}`);
-      doc.text(`Status: ${audit.status}`);
-      doc.text(`Risk Level: ${audit.riskLevel || 'Not specified'}`);
-      doc.fontSize(14).text(`Manager: ${audit.assignedManager?.name || 'Not assigned'}`);
-      doc.text(`Generated: ${new Date().toLocaleDateString()}`);
-      doc.moveDown();
-
-      doc.fontSize(16).text('Executive Summary', { underline: true });
-      doc.moveDown();
-      doc.fontSize(12).text('Audit objectives and scope information would be displayed here.');
-      doc.moveDown();
-
-      doc.fontSize(16).text('Audit Programs', { underline: true });
-      doc.moveDown();
-      
-      if (audit.auditPrograms && audit.auditPrograms.length > 0) {
-        audit.auditPrograms.forEach((program: any, index: number) => {
-          doc.fontSize(12).text(`${index + 1}. ${program.programName || `Program ${index + 1}`}`);
-          if (program.objectives) {
-            doc.text(`   Objectives: ${program.objectives}`);
-          }
-          doc.moveDown(0.5);
-        });
-      } else {
-        doc.fontSize(12).text('No audit programs found.');
-      }
-
-    } catch (error) {
-      doc.fontSize(12).text('Error generating PDF content');
-      console.error('PDF generation error:', error);
+      throw new InternalServerErrorException('Failed to share audit report');
     }
   }
 }

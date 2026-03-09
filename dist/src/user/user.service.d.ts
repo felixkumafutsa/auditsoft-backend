@@ -17,12 +17,6 @@ export declare class UpdateUserDto {
     auditUniverseEntityIds?: number[];
     profilePicture?: string;
 }
-export declare class CreateProcessOwnerDto {
-    name: string;
-    email: string;
-    password: string;
-    auditUniverseId: number;
-}
 export declare class UserService {
     private prisma;
     constructor(prisma: PrismaService);
@@ -38,5 +32,4 @@ export declare class UserService {
     removeRole(userId: number, roleId: number): Promise<void>;
     getUserRoles(userId: number): Promise<any[]>;
     getTasks(userId: number): Promise<any[]>;
-    createProcessOwner(data: CreateProcessOwnerDto): Promise<Omit<User, 'passwordHash'>>;
 }

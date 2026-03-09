@@ -17,9 +17,6 @@ export class AuditUniverseService {
     if (data.riskRating !== undefined) {
       createData.riskRating = data.riskRating;
     }
-    if (data.ownerId !== undefined) {
-      createData.ownerId = data.ownerId;
-    }
 
     return this.prisma.auditUniverse.create({
       data: createData,
@@ -27,19 +24,12 @@ export class AuditUniverseService {
   }
 
   findAll() {
-    return this.prisma.auditUniverse.findMany({
-      include: {
-        owner: true,
-      },
-    });
+    return this.prisma.auditUniverse.findMany();
   }
 
   findOne(id: number) {
     return this.prisma.auditUniverse.findUnique({
       where: { id },
-      include: {
-        owner: true,
-      },
     });
   }
 

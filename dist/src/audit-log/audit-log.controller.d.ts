@@ -9,9 +9,9 @@ export declare class AuditLogController {
         };
     } & {
         id: number;
-        entityType: string;
         userId: number;
         action: string;
+        entityType: string;
         entityId: number | null;
         timestamp: Date;
         ipAddress: string | null;
@@ -24,9 +24,9 @@ export declare class AuditLogController {
         };
     } & {
         id: number;
-        entityType: string;
         userId: number;
         action: string;
+        entityType: string;
         entityId: number | null;
         timestamp: Date;
         ipAddress: string | null;

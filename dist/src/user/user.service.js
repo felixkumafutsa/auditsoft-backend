@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserService = exports.CreateProcessOwnerDto = exports.UpdateUserDto = exports.CreateUserDto = void 0;
+exports.UserService = exports.UpdateUserDto = exports.CreateUserDto = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const crypto_1 = require("crypto");
@@ -99,29 +99,6 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateUserDto.prototype, "profilePicture", void 0);
-class CreateProcessOwnerDto {
-    name;
-    email;
-    password;
-    auditUniverseId;
-}
-exports.CreateProcessOwnerDto = CreateProcessOwnerDto;
-__decorate([
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateProcessOwnerDto.prototype, "name", void 0);
-__decorate([
-    (0, class_validator_1.IsEmail)(),
-    __metadata("design:type", String)
-], CreateProcessOwnerDto.prototype, "email", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateProcessOwnerDto.prototype, "password", void 0);
-__decorate([
-    (0, class_validator_1.IsNumber)(),
-    __metadata("design:type", Number)
-], CreateProcessOwnerDto.prototype, "auditUniverseId", void 0);
 let UserService = class UserService {
     prisma;
     constructor(prisma) {
@@ -196,9 +173,6 @@ let UserService = class UserService {
                 profilePicture: data.profilePicture || undefined,
                 status: data.status || 'active',
                 mfaEnabled: data.mfaEnabled || false,
-                auditUniverseOwner: data.auditUniverseEntityIds ? {
-                    connect: data.auditUniverseEntityIds.map(id => ({ id }))
-                } : undefined,
             },
             select: {
                 id: true,
@@ -234,9 +208,6 @@ let UserService = class UserService {
                 mfaEnabled: data.mfaEnabled,
                 passwordHash: passwordHash,
                 profilePicture: data.profilePicture || undefined,
-                auditUniverseOwner: data.auditUniverseEntityIds ? {
-                    set: data.auditUniverseEntityIds.map(id => ({ id }))
-                } : undefined,
             },
             select: {
                 id: true,
@@ -421,57 +392,6 @@ let UserService = class UserService {
             }
         }
         return tasks;
-    }
-    async createProcessOwner(data) {
-        if (!data.name || !data.email || !data.password || !data.auditUniverseId) {
-            throw new common_1.BadRequestException('Name, email, password, and auditUniverseId are required');
-        }
-        const existingUser = await this.findByEmail(data.email);
-        if (existingUser) {
-            throw new common_1.BadRequestException('Email already in use');
-        }
-        const auditUniverse = await this.prisma.auditUniverse.findUnique({
-            where: { id: data.auditUniverseId },
-        });
-        if (!auditUniverse) {
-            throw new common_1.BadRequestException(`Audit Universe with ID ${data.auditUniverseId} not found`);
-        }
-        const processOwnerRole = await this.prisma.role.findUnique({
-            where: { roleName: 'Process Owner' },
-        });
-        if (!processOwnerRole) {
-            throw new common_1.BadRequestException('Process Owner role not found');
-        }
-        const passwordHash = await this.hashPassword(data.password);
-        return this.prisma.user.create({
-            data: {
-                name: data.name,
-                email: data.email,
-                passwordHash: passwordHash,
-                status: 'active',
-                mfaEnabled: false,
-                userRoles: {
-                    create: [{
-                            roleId: processOwnerRole.id,
-                        }],
-                },
-                auditUniverseOwner: {
-                    connect: { id: data.auditUniverseId },
-                },
-            },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                profilePicture: true,
-                status: true,
-                mfaEnabled: true,
-                createdAt: true,
-                updatedAt: true,
-                userRoles: { include: { role: true } },
-                auditUniverseOwner: true,
-            },
-        });
     }
 };
 exports.UserService = UserService;

@@ -3,7 +3,6 @@ export declare enum FindingStatus {
     VALIDATED = "Validated",
     ACTION_ASSIGNED = "Action Assigned",
     REMEDIATION_IN_PROGRESS = "Remediation In Progress",
-    VERIFIED = "Verified",
     CLOSED = "Closed"
 }
 export declare enum FindingSeverity {

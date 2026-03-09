@@ -1,9 +1,10 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EvidenceStatus, EvidenceWorkflowService } from '../workflow/evidence.workflow';
 import { AuditService } from '../audit/audit.service';
 import * as path from 'path';
 import { promises as fs } from 'fs';
+import * as fsSync from 'fs';
 
 import { NotificationService } from '../notification/notification.service';
 
@@ -17,7 +18,74 @@ export class EvidenceService {
     private notificationService: NotificationService,
     private workflowService: EvidenceWorkflowService,
     private auditLogService: AuditLogService,
-  ) { }
+  ) {
+    // Proactively audit and fix evidence file mismatches on service startup
+    this.auditAndFixEvidenceFiles();
+  }
+
+  private async auditAndFixEvidenceFiles() {
+    try {
+      console.log('[EVIDENCE] Starting proactive file audit...');
+      
+      const allEvidence = await this.prisma.evidence.findMany({
+        select: { id: true, fileName: true }
+      });
+      
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'evidence');
+      const existingFiles = fsSync.existsSync(uploadsDir) ? fsSync.readdirSync(uploadsDir) : [];
+      
+      let fixedCount = 0;
+      
+      for (const evidence of allEvidence) {
+        const expectedPath = path.join(uploadsDir, `${evidence.id}-${evidence.fileName}`);
+        
+        if (!fsSync.existsSync(expectedPath)) {
+          const filesWithId = existingFiles.filter(f => f.startsWith(`${evidence.id}-`));
+          
+          if (filesWithId.length > 0) {
+            const availableFile = filesWithId[0];
+            const actualFileName = availableFile.substring(`${evidence.id}-`.length);
+            
+            await this.prisma.evidence.update({
+              where: { id: evidence.id },
+              data: {
+                fileName: actualFileName,
+                fileType: this.getMimeTypeFromExtension(actualFileName) || 'application/octet-stream'
+              }
+            });
+            
+            fixedCount++;
+            console.log(`[EVIDENCE AUTO-FIX] Evidence ${evidence.id}: "${evidence.fileName}" → "${actualFileName}"`);
+          }
+        }
+      }
+      
+      if (fixedCount > 0) {
+        console.log(`[EVIDENCE] Proactively fixed ${fixedCount} evidence file mismatches`);
+      } else {
+        console.log(`[EVIDENCE] All evidence files are correctly matched`);
+      }
+    } catch (error) {
+      console.error('[EVIDENCE] Error during proactive audit:', error);
+    }
+  }
+
+  private getMimeTypeFromExtension(fileName: string): string | null {
+    const ext = path.extname(fileName).toLowerCase();
+    const mimeTypes = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.bmp': 'image/bmp',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      '.pdf': 'application/pdf',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    };
+    return mimeTypes[ext] || null;
+  }
 
   async create(auditProgramId: number, file: any, description?: string, uploadedById?: number, user?: any) {
     if (user) {
@@ -33,7 +101,7 @@ export class EvidenceService {
 
       // Verify access to the audit and status
       const audit = await this.auditService.findOne(auditProgram.auditId, user);
-      const allowedStatuses = ['In Progress', 'Under Review', 'Execution Finished', 'Process Owner Review'];
+      const allowedStatuses = ['In Progress', 'Under Review', 'Execution Finished'];
       if (!allowedStatuses.includes(audit.status)) {
         throw new BadRequestException(`Evidence can only be uploaded for audits that are 'In Progress' or 'Under Review'. Current status: ${audit.status}`);
       }
@@ -112,7 +180,51 @@ export class EvidenceService {
   async getFileInfo(id: number) {
     const evidence = await this.findOne(id);
     if (!evidence) throw new BadRequestException('Evidence not found');
-    const filePath = path.join(process.cwd(), 'uploads', 'evidence', `${evidence.id}-${evidence.fileName}`);
+    
+    // Primary file path
+    let filePath = path.join(process.cwd(), 'uploads', 'evidence', `${evidence.id}-${evidence.fileName}`);
+    
+    // If primary file doesn't exist, try to find any file with the same ID
+    if (!fsSync.existsSync(filePath)) {
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'evidence');
+      try {
+        const files = await fs.readdir(uploadsDir);
+        const filesWithId = files.filter(f => f.startsWith(`${evidence.id}-`));
+        
+        if (filesWithId.length > 0) {
+          // Use the first available file
+          const availableFile = filesWithId[0];
+          filePath = path.join(uploadsDir, availableFile);
+          const actualFileName = availableFile.substring(`${evidence.id}-`.length);
+          
+          // Update the database record to reflect the actual file
+          await this.prisma.evidence.update({
+            where: { id },
+            data: { 
+              fileName: actualFileName,
+              fileType: this.getMimeTypeFromExtension(actualFileName) || evidence.fileType
+            }
+          });
+          
+          console.log(`[EVIDENCE AUTO-RECOVERY] Updated evidence ${id} filename from "${evidence.fileName}" to "${actualFileName}"`);
+          
+          // Return the updated file info
+          return { 
+            filePath, 
+            fileType: this.getMimeTypeFromExtension(actualFileName) || evidence.fileType, 
+            fileName: actualFileName 
+          };
+        } else {
+          // No files found for this evidence ID
+          console.warn(`[EVIDENCE WARNING] No files found for evidence ID ${id} (expected: ${evidence.fileName})`);
+          throw new NotFoundException(`No files found for evidence ID ${id}. Expected file: ${evidence.fileName}`);
+        }
+      } catch (error) {
+        console.error('Error checking fallback files:', error);
+        throw new NotFoundException(`File not found on server disk: ${filePath}`);
+      }
+    }
+    
     return { filePath, fileType: evidence.fileType, fileName: evidence.fileName };
   }
 
@@ -148,13 +260,12 @@ export class EvidenceService {
   }
 
   private attachFileStatus(items: any[]) {
-    const fs = require('fs');
     const uploadsDir = path.join(process.cwd(), 'uploads', 'evidence');
     return items.map(item => {
       const filePath = path.join(uploadsDir, `${item.id}-${item.fileName}`);
       return {
         ...item,
-        fileMissing: !fs.existsSync(filePath)
+        fileMissing: !fsSync.existsSync(filePath)
       };
     });
   }
@@ -197,11 +308,10 @@ export class EvidenceService {
 
     if (!item) return null;
 
-    const fs = require('fs');
     const filePath = path.join(process.cwd(), 'uploads', 'evidence', `${item.id}-${item.fileName}`);
     return {
       ...item,
-      fileMissing: !fs.existsSync(filePath)
+      fileMissing: !fsSync.existsSync(filePath)
     };
   }
 
@@ -286,7 +396,7 @@ export class EvidenceService {
     });
     if (auditProgram?.auditId) {
       const audit = await this.auditService.findOne(auditProgram.auditId);
-      const allowedAuditStatuses = ['In Progress', 'Under Review', 'Execution Finished', 'Finalized', 'Process Owner Review'];
+      const allowedAuditStatuses = ['In Progress', 'Under Review', 'Execution Finished', 'Finalized'];
       if (!allowedAuditStatuses.includes(audit.status)) {
         throw new BadRequestException(`Evidence status cannot be changed when audit is in '${audit.status}' status.`);
       }

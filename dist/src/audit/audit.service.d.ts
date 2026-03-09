@@ -53,7 +53,6 @@ export declare class AuditService {
     findAllLightweight(user?: any): Promise<Partial<Audit>[]>;
     findOne(id: number, user?: any): Promise<Audit>;
     findTemplates(): Promise<Audit[]>;
-    findForOwner(ownerId: number): Promise<Audit[]>;
     create(data: CreateAuditDto, user?: any): Promise<Audit>;
     update(id: number, data: UpdateAuditDto, user?: any): Promise<Audit>;
     delete(id: number): Promise<Audit>;

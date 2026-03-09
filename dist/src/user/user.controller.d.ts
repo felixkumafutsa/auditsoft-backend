@@ -1,4 +1,4 @@
-import { UserService, CreateUserDto, UpdateUserDto, CreateProcessOwnerDto } from './user.service';
+import { UserService, CreateUserDto, UpdateUserDto } from './user.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 export declare class UserController {
     private userService;
@@ -77,16 +77,5 @@ export declare class UserController {
     }>;
     assignRole(userId: number, roleId: number): Promise<any>;
     removeRole(userId: number, roleId: number): Promise<void>;
-    createProcessOwner(data: CreateProcessOwnerDto): Promise<Omit<{
-        name: string;
-        email: string;
-        status: string;
-        mfaEnabled: boolean;
-        profilePicture: string | null;
-        id: number;
-        passwordHash: string;
-        createdAt: Date;
-        updatedAt: Date;
-    }, "passwordHash">>;
     getUserRoles(userId: number): Promise<any[]>;
 }

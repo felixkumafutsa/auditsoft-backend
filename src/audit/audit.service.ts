@@ -177,15 +177,11 @@ export class AuditService {
     if (user) {
       const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
       const isAuditor = roles.includes('Auditor');
-      // Normalize role check (handle potential variations in casing/spacing)
-      const isProcessOwner = roles.some(r => r.toLowerCase().includes('process owner'));
       const isAdminOrManager = roles.some(r => ['System Administrator', 'Audit Manager', 'CAE', 'Chief Auditor'].includes(r));
 
       if (!isAdminOrManager) {
         if (isAuditor) {
           where.assignedAuditors = { some: { id: user.id } };
-        } else if (isProcessOwner) {
-          where.auditUniverse = { ownerId: user.id };
         }
       }
     }
@@ -254,14 +250,11 @@ export class AuditService {
     if (user) {
       const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
       const isAuditor = roles.includes('Auditor');
-      const isProcessOwner = roles.some(r => r.toLowerCase().includes('process owner'));
       const isAdminOrManager = roles.some(r => ['System Administrator', 'Audit Manager', 'CAE', 'Chief Auditor'].includes(r));
 
       if (!isAdminOrManager) {
         if (isAuditor) {
           where.assignedAuditors = { some: { id: user.id } };
-        } else if (isProcessOwner) {
-          where.auditUniverse = { ownerId: user.id };
         }
       }
     }
@@ -302,7 +295,6 @@ export class AuditService {
     if (user) {
       const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
       const isAuditor = roles.includes('Auditor');
-      const isProcessOwner = roles.some(r => r.toLowerCase().includes('process owner'));
       const isAdminOrManager = roles.some(r => ['System Administrator', 'Audit Manager', 'CAE', 'Chief Auditor'].includes(r));
 
       if (!isAdminOrManager) {
@@ -310,10 +302,6 @@ export class AuditService {
           const isAssigned = audit.assignedAuditors.some((auditor) => auditor.id === user.id);
           if (!isAssigned) {
             throw new ForbiddenException(`You do not have access to this audit`);
-          }
-        } else if (isProcessOwner) {
-          if (audit.auditUniverse?.ownerId !== user.id) {
-            throw new ForbiddenException(`You do not have access to audits for this entity`);
           }
         }
       }
@@ -327,17 +315,6 @@ export class AuditService {
       where: { status: 'Template' },
       include: { auditPrograms: true },
       orderBy: { auditName: 'asc' }
-    });
-  }
-
-  async findForOwner(ownerId: number): Promise<Audit[]> {
-    return this.prisma.audit.findMany({
-      where: {
-        status: { not: 'Template' },
-        auditUniverse: { ownerId },
-      },
-      include: { findings: true, auditPrograms: true, assignedManager: true, assignedAuditors: true, auditUniverse: true },
-      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -495,11 +472,7 @@ export class AuditService {
         auditPrograms: true,
         assignedAuditors: true,
         assignedManager: true,
-        auditUniverse: {
-          include: {
-            owner: true
-          }
-        }
+        auditUniverse: true
       },
     });
 
@@ -567,8 +540,25 @@ export class AuditService {
         }
       }
 
-      // Under Review -> Finalized: Generate PDF and Alert Chief Auditor for approval
+      // Under Review -> Finalized: Validate findings are closed, then Generate PDF and Alert Chief Auditor for approval
       if (existingAudit.status === 'Under Review' && data.status === 'Finalized') {
+        // Check if all findings are closed
+        const openFindings = await this.prisma.finding.findMany({
+          where: {
+            auditId: id,
+            status: {
+              notIn: ['Closed']
+            }
+          }
+        });
+
+        if (openFindings.length > 0) {
+          throw new BadRequestException(
+            `Cannot finalize audit. ${openFindings.length} finding(s) are still open. ` +
+            'All findings must be closed before the audit can be finalized.'
+          );
+        }
+
         // Generate PDF report when audit is finalized
         await this.reportsService.generatePDFToFile(updatedAudit.id);
 

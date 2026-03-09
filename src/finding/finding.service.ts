@@ -425,31 +425,6 @@ export class FindingService {
       const link = `/audits/${finding.auditId}`;
       const findingDesc = finding.description.substring(0, 50);
 
-      // Validated -> Action Assigned: Notify Process Owners
-      if (oldStatus === 'Validated' && newStatus === 'Action Assigned') {
-        // Notify Process Owners
-        const processOwners = await this.prisma.user.findMany({
-          where: {
-            userRoles: {
-              some: {
-                role: {
-                  roleName: { in: ['Process Owner'] }
-                }
-              }
-            }
-          }
-        });
-        for (const processOwner of processOwners) {
-          await this.notificationService.create({
-            userId: processOwner.id,
-            title: 'Action Plan Assigned',
-            message: `Action plan has been assigned for finding "${findingDesc}..." in audit #${finding.auditId}`,
-            type: 'info',
-            link
-          });
-        }
-      }
-
       // Action Assigned -> Remediation In Progress: Notify Chief Auditor
       if (oldStatus === 'Action Assigned' && newStatus === 'Remediation In Progress') {
         // Notify Chief Auditors

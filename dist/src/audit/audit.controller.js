@@ -39,10 +39,6 @@ let AuditController = class AuditController {
     getLightweight(req) {
         return this.auditService.findAllLightweight(req.user);
     }
-    getForOwner(req) {
-        const userId = req.user?.userId ?? req.user?.id;
-        return this.auditService.findForOwner(Number(userId));
-    }
     getTemplates() {
         return this.auditService.findTemplates();
     }
@@ -132,14 +128,6 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AuditController.prototype, "getLightweight", null);
-__decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, common_1.Get)('owner'),
-    __param(0, (0, common_1.Req)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
-], AuditController.prototype, "getForOwner", null);
 __decorate([
     (0, common_1.Get)('templates'),
     __metadata("design:type", Function),

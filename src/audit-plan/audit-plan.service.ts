@@ -7,10 +7,59 @@ export class AuditPlanService {
 
   // Get annual audit plan with quarterly breakdown
   async getAnnualPlan(year: number) {
-    const audits = await this.prisma.audit.findMany({
-      where: {
-        year: year,
+    console.log(`Getting annual plan for year: ${year}`);
+    
+    // Get all audits to understand the data distribution
+    const allAudits = await this.prisma.audit.findMany({
+      select: {
+        id: true,
+        auditName: true,
+        year: true,
+        quarter: true,
+        status: true,
+        createdAt: true
       },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    console.log(`Found ${allAudits.length} total audits`);
+    console.log('Year distribution:', allAudits.reduce((acc, audit) => {
+      acc[audit.year || 'null'] = (acc[audit.year || 'null'] || 0) + 1;
+      return acc;
+    }, {}));
+
+    // Smart year filtering: if no audits exist for the requested year, 
+    // return audits from the most recent year that has audits
+    let targetYear = year;
+    const yearsWithAudits = allAudits
+      .filter(a => a.year !== null && a.year !== undefined)
+      .map(a => a.year!);
+    
+    const uniqueYears = [...new Set(yearsWithAudits)].sort((a, b) => b - a);
+    
+    // If no audits have years set, or the requested year doesn't exist, use all audits
+    if (uniqueYears.length === 0) {
+      console.log('No audits have years set, showing all audits');
+      targetYear = year; // Keep original year but will use OR condition below
+    } else if (!uniqueYears.includes(year)) {
+      targetYear = uniqueYears[0]; // Use the most recent year with audits
+      console.log(`No audits found for year ${year}, using year ${targetYear} instead`);
+    }
+
+    // Get audits for the target year, plus any without a year set (for backward compatibility)
+    // If no years are set at all, get all audits
+    const whereCondition = uniqueYears.length === 0 
+      ? {} // Get all audits if no years are set
+      : {
+          OR: [
+            { year: targetYear },
+            { year: null },
+            { year: undefined }
+          ]
+        };
+
+    const audits = await this.prisma.audit.findMany({
+      where: whereCondition,
       include: {
         assignedManager: {
           select: { id: true, name: true }
@@ -31,6 +80,8 @@ export class AuditPlanService {
         { riskScore: 'desc' }
       ]
     });
+
+    console.log(`Found ${audits.length} audits (using year filter strategy: ${uniqueYears.length === 0 ? 'all audits' : `year ${targetYear} + null years`})`);
 
     // Group by quarters
     const quarterlyPlan = {
@@ -53,7 +104,7 @@ export class AuditPlanService {
     };
 
     return {
-      year,
+      year: targetYear, // Return the actual year being used
       summary,
       quarterlyPlan,
       audits
@@ -74,9 +125,6 @@ export class AuditPlanService {
             where: {
               year: new Date().getFullYear()
             }
-          },
-          owner: {
-            select: { id: true, name: true }
           }
         }
       });

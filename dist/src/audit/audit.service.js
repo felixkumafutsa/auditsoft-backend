@@ -285,14 +285,10 @@ let AuditService = class AuditService {
         if (user) {
             const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
             const isAuditor = roles.includes('Auditor');
-            const isProcessOwner = roles.some(r => r.toLowerCase().includes('process owner'));
             const isAdminOrManager = roles.some(r => ['System Administrator', 'Audit Manager', 'CAE', 'Chief Auditor'].includes(r));
             if (!isAdminOrManager) {
                 if (isAuditor) {
                     where.assignedAuditors = { some: { id: user.id } };
-                }
-                else if (isProcessOwner) {
-                    where.auditUniverse = { ownerId: user.id };
                 }
             }
         }
@@ -349,14 +345,10 @@ let AuditService = class AuditService {
         if (user) {
             const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
             const isAuditor = roles.includes('Auditor');
-            const isProcessOwner = roles.some(r => r.toLowerCase().includes('process owner'));
             const isAdminOrManager = roles.some(r => ['System Administrator', 'Audit Manager', 'CAE', 'Chief Auditor'].includes(r));
             if (!isAdminOrManager) {
                 if (isAuditor) {
                     where.assignedAuditors = { some: { id: user.id } };
-                }
-                else if (isProcessOwner) {
-                    where.auditUniverse = { ownerId: user.id };
                 }
             }
         }
@@ -392,18 +384,12 @@ let AuditService = class AuditService {
         if (user) {
             const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
             const isAuditor = roles.includes('Auditor');
-            const isProcessOwner = roles.some(r => r.toLowerCase().includes('process owner'));
             const isAdminOrManager = roles.some(r => ['System Administrator', 'Audit Manager', 'CAE', 'Chief Auditor'].includes(r));
             if (!isAdminOrManager) {
                 if (isAuditor) {
                     const isAssigned = audit.assignedAuditors.some((auditor) => auditor.id === user.id);
                     if (!isAssigned) {
                         throw new common_1.ForbiddenException(`You do not have access to this audit`);
-                    }
-                }
-                else if (isProcessOwner) {
-                    if (audit.auditUniverse?.ownerId !== user.id) {
-                        throw new common_1.ForbiddenException(`You do not have access to audits for this entity`);
                     }
                 }
             }
@@ -415,16 +401,6 @@ let AuditService = class AuditService {
             where: { status: 'Template' },
             include: { auditPrograms: true },
             orderBy: { auditName: 'asc' }
-        });
-    }
-    async findForOwner(ownerId) {
-        return this.prisma.audit.findMany({
-            where: {
-                status: { not: 'Template' },
-                auditUniverse: { ownerId },
-            },
-            include: { findings: true, auditPrograms: true, assignedManager: true, assignedAuditors: true, auditUniverse: true },
-            orderBy: { createdAt: 'desc' },
         });
     }
     async create(data, user) {
@@ -539,11 +515,7 @@ let AuditService = class AuditService {
                 auditPrograms: true,
                 assignedAuditors: true,
                 assignedManager: true,
-                auditUniverse: {
-                    include: {
-                        owner: true
-                    }
-                }
+                auditUniverse: true
             },
         });
         if (data.assignedAuditorIds && data.assignedAuditorIds.length > 0) {
@@ -597,6 +569,18 @@ let AuditService = class AuditService {
                 }
             }
             if (existingAudit.status === 'Under Review' && data.status === 'Finalized') {
+                const openFindings = await this.prisma.finding.findMany({
+                    where: {
+                        auditId: id,
+                        status: {
+                            notIn: ['Closed']
+                        }
+                    }
+                });
+                if (openFindings.length > 0) {
+                    throw new common_1.BadRequestException(`Cannot finalize audit. ${openFindings.length} finding(s) are still open. ` +
+                        'All findings must be closed before the audit can be finalized.');
+                }
                 await this.reportsService.generatePDFToFile(updatedAudit.id);
                 const chiefAuditors = await this.prisma.user.findMany({
                     where: {

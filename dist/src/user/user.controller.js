@@ -21,7 +21,6 @@ const path_1 = require("path");
 const uuid_1 = require("uuid");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 const roles_guard_1 = require("../common/guards/roles.guard");
-const roles_decorator_1 = require("../common/decorators/roles.decorator");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const profileStorage = (0, multer_1.diskStorage)({
     destination: './uploads/profile-pictures',
@@ -80,9 +79,6 @@ let UserController = class UserController {
     }
     removeRole(userId, roleId) {
         return this.userService.removeRole(userId, roleId);
-    }
-    createProcessOwner(data) {
-        return this.userService.createProcessOwner(data);
     }
     getUserRoles(userId) {
         return this.userService.getUserRoles(userId);
@@ -176,14 +172,6 @@ __decorate([
     __metadata("design:paramtypes", [Number, Number]),
     __metadata("design:returntype", void 0)
 ], UserController.prototype, "removeRole", null);
-__decorate([
-    (0, common_1.Post)('process-owner'),
-    (0, roles_decorator_1.Roles)('System Administrator'),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [user_service_1.CreateProcessOwnerDto]),
-    __metadata("design:returntype", void 0)
-], UserController.prototype, "createProcessOwner", null);
 __decorate([
     (0, common_1.Get)(':userId/roles'),
     __param(0, (0, common_1.Param)('userId', common_1.ParseIntPipe)),
