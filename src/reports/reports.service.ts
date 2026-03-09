@@ -2002,12 +2002,22 @@ export class ReportsService {
       console.log('Email:', email);
       console.log('User:', user);
       
-      // Get audit details
+      // Get audit details with existing reports
       const audit = await this.prisma.audit.findUnique({
         where: { id: auditId },
         include: {
           assignedManager: {
             select: { name: true, email: true }
+          },
+          reports: {
+            where: { 
+              AND: [
+                { fileUrl: { not: null } },
+                { fileUrl: { not: '' } }
+              ]
+            },
+            orderBy: { generatedAt: 'desc' },
+            take: 1
           }
         }
       });
@@ -2016,8 +2026,41 @@ export class ReportsService {
         throw new NotFoundException('Audit not found');
       }
 
-      console.log('Generating PDF...');
-      const pdfBuffer = await this.generatePDFBuffer(auditId);
+      let pdfBuffer: Buffer;
+      let reportFileName: string;
+
+      // Check if there's an existing report file
+      if (audit.reports && audit.reports.length > 0 && audit.reports[0].fileUrl) {
+        const existingReport = audit.reports[0];
+        const filePath = existingReport.fileUrl!.startsWith('/') 
+          ? existingReport.fileUrl!.substring(1) // Remove leading slash
+          : existingReport.fileUrl!;
+        
+        console.log('Found existing report:', existingReport.title);
+        console.log('File path:', filePath);
+        
+        try {
+          // Try to read the existing file
+          const fs = require('fs');
+          if (fs.existsSync(filePath)) {
+            pdfBuffer = fs.readFileSync(filePath);
+            reportFileName = `${audit.auditName.replace(/[^a-z0-9]/gi, '_')}_Report.pdf`;
+            console.log('Using existing PDF file, size:', pdfBuffer.length, 'bytes');
+          } else {
+            console.log('Existing report file not found, generating new PDF...');
+            throw new Error('File not found');
+          }
+        } catch (fileError) {
+          console.log('Failed to read existing report file:', fileError.message);
+          console.log('Falling back to PDF generation...');
+          pdfBuffer = await this.generatePDFBuffer(auditId);
+          reportFileName = `Audit_Report_${audit.auditName.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+        }
+      } else {
+        console.log('No existing report found, generating new PDF...');
+        pdfBuffer = await this.generatePDFBuffer(auditId);
+        reportFileName = `Audit_Report_${audit.auditName.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+      }
       
       // Create email content
       const emailSubject = `Audit Report: ${audit.auditName}`;
@@ -2034,7 +2077,7 @@ export class ReportsService {
             text: emailBody,
             attachments: [
               {
-                filename: `Audit_Report_${audit.auditName.replace(/[^a-z0-9]/gi, '_')}.pdf`,
+                filename: reportFileName,
                 content: pdfBuffer,
                 contentType: 'application/pdf'
               }
@@ -2053,7 +2096,7 @@ export class ReportsService {
         console.log('To:', email);
         console.log('Subject:', emailSubject);
         console.log('Body:', emailBody);
-        console.log('Attachment:', `Audit_Report_${audit.auditName.replace(/[^a-z0-9]/gi, '_')}.pdf (${pdfBuffer.length} bytes)`);
+        console.log('Attachment:', reportFileName + ' (' + pdfBuffer.length + ' bytes)');
         console.log('Shared by:', user?.name || user?.email || 'Chief Auditor');
         console.log('================================================');
       }
@@ -2075,7 +2118,8 @@ export class ReportsService {
           auditName: audit.auditName,
           recipientEmail: email,
           sharedAt: new Date(),
-          sharedBy: user?.name || user?.email || 'Chief Auditor'
+          sharedBy: user?.name || user?.email || 'Chief Auditor',
+          reportSource: audit.reports && audit.reports.length > 0 ? 'Stored Report' : 'Generated PDF'
         }
       };
     } catch (error) {
