@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuditService } from './audit.service';
 import { AuditController } from './audit.controller';
 import { AuditWorkflowController } from './audit-workflow.controller';
+import { RiskAssessmentController } from './risk-assessment.controller';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditWorkflowService } from '../workflow/audit.workflow';
 import { AuditTimelineService } from './audit-timeline.service';
@@ -16,7 +17,7 @@ import { TimesheetController } from './timesheet.controller';
 
 @Module({
   imports: [NotificationModule, ReportsModule],
-  controllers: [AuditController, AuditWorkflowController, TimesheetController],
+  controllers: [AuditController, AuditWorkflowController, TimesheetController, RiskAssessmentController],
   providers: [
     AuditService,
     PrismaService,

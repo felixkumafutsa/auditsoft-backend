@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import PDFDocument from 'pdfkit';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
@@ -79,19 +79,109 @@ export class ReportsService {
     private prisma: PrismaService,
     private notificationService?: NotificationService
   ) {
+    this.emailTransporter = null;
+    
+    // Initialize email transporter asynchronously
+    this.initializeEmailTransporter();
+  }
+
+  private async initializeEmailTransporter() {
     // Initialize email transporter only if credentials are available
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-      this.emailTransporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS
+      console.log(`Email configuration:`);
+      console.log(`- Host: ${process.env.EMAIL_HOST || 'mw265.com'}`);
+      console.log(`- Port: ${process.env.EMAIL_PORT || '587'}`);
+      console.log(`- Username: ${process.env.EMAIL_USER}`);
+      console.log(`- Password length: ${process.env.EMAIL_PASS.length} characters`);
+      
+      // Try with different configurations based on Plesk limitations
+      const emailConfigs = [
+        {
+          name: 'Standard SMTP with STARTTLS',
+          config: {
+            host: process.env.EMAIL_HOST || 'mw265.com',
+            port: parseInt(process.env.EMAIL_PORT || '587'),
+            secure: false, // STARTTLS
+            auth: {
+              user: process.env.EMAIL_USER,
+              pass: process.env.EMAIL_PASS
+            },
+            tls: {
+              rejectUnauthorized: false,
+              servername: process.env.EMAIL_HOST || 'mw265.com'
+            },
+            debug: true,
+            logger: true
+          }
+        },
+        {
+          name: 'Alternative SMTP with SSL',
+          config: {
+            host: process.env.EMAIL_HOST || 'mw265.com',
+            port: 465,
+            secure: true, // SSL
+            auth: {
+              user: process.env.EMAIL_USER,
+              pass: process.env.EMAIL_PASS
+            },
+            tls: {
+              rejectUnauthorized: false,
+              servername: process.env.EMAIL_HOST || 'mw265.com'
+            },
+            debug: true,
+            logger: true
+          }
+        },
+        {
+          name: 'Gmail as fallback',
+          config: {
+            service: 'gmail',
+            auth: {
+              user: process.env.EMAIL_USER,
+              pass: process.env.EMAIL_PASS
+            },
+            debug: true,
+            logger: true
+          }
         }
-      });
+      ];
+
+      // Try each configuration until one works
+      for (const [index, emailConfig] of emailConfigs.entries()) {
+        try {
+          console.log(`\n🔄 Trying configuration ${index + 1}: ${emailConfig.name}`);
+          
+          this.emailTransporter = nodemailer.createTransport(emailConfig.config);
+          
+          const success = await this.testEmailTransporter(this.emailTransporter);
+          if (success) {
+            console.log(`✅ Email configuration successful with: ${emailConfig.name}`);
+            break;
+          } else {
+            console.log(`❌ Configuration ${index + 1} failed, trying next...`);
+          }
+        } catch (error) {
+          console.log(`❌ Configuration ${index + 1} error:`, error.message);
+        }
+      }
     } else {
       console.log('Email credentials not configured. Email sharing will be logged only.');
       this.emailTransporter = null;
     }
+  }
+
+  private async testEmailTransporter(transporter: any): Promise<boolean> {
+    return new Promise((resolve) => {
+      transporter.verify((error, success) => {
+        if (error) {
+          console.log(`   Verification failed: ${error.message}`);
+          resolve(false);
+        } else {
+          console.log(`   Verification successful`);
+          resolve(true);
+        }
+      });
+    });
   }
 
   // ... existing methods ...
@@ -321,19 +411,24 @@ export class ReportsService {
   private async generatePDFBuffer(auditId: number): Promise<Buffer> {
     return new Promise(async (resolve, reject) => {
       const buffers: Buffer[] = [];
-      const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+      const doc = new PDFDocument({ 
+        margin: 50, 
+        size: 'A4', 
+        layout: 'portrait',
+        bufferPages: true
+      });
 
       doc.on('data', (chunk) => buffers.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', reject);
 
-      // Generate PDF content (await the content generation)
-      await this.generatePDFContent(doc, auditId);
+      // Generate comprehensive PDF content
+      await this.generateComprehensivePDFContent(doc, auditId);
       doc.end();
     });
   }
 
-  private async generatePDFContent(doc: any, auditId: number) {
+  private async generateComprehensivePDFContent(doc: any, auditId: number) {
     try {
       const audit = await this.prisma.audit.findUnique({
         where: { id: auditId },
@@ -351,9 +446,15 @@ export class ReportsService {
                     }
                   }
                 }
+              },
+              controlMappings: {
+                include: {
+                  framework: true
+                }
               }
             }
-          }
+          },
+          risks: true
         }
       });
 
@@ -361,43 +462,357 @@ export class ReportsService {
         throw new Error('Audit not found');
       }
 
-      // PDF Content Generation
-      doc.fontSize(20).text('Audit Report', { align: 'center' });
+      // Enable buffered pages for better page management
+      const { height } = doc.page;
+      const bottomMargin = 100;
+
+      // Helper function to check if we need a new page
+      const checkPageBreak = (requiredSpace: number = 50) => {
+        if (doc.y > height - bottomMargin - requiredSpace) {
+          doc.addPage();
+          return true;
+        }
+        return false;
+      };
+
+      // Helper function for section headers
+      const addSectionHeader = (title: string) => {
+        checkPageBreak(80);
+        doc.fontSize(18).font('Helvetica-Bold').text(title, { align: 'center' });
+        doc.moveDown(0.5);
+        // Add underline
+        const underlineY = doc.y;
+        doc.moveTo(50, underlineY).lineTo(doc.page.width - 50, underlineY).lineWidth(1).stroke();
+        doc.moveDown();
+      };
+
+      // Helper function for subsection headers
+      const addSubsectionHeader = (title: string) => {
+        checkPageBreak(60);
+        doc.fontSize(14).font('Helvetica-Bold').text(title);
+        doc.moveDown(0.3);
+      };
+
+      // Title Page
+      doc.fontSize(24).font('Helvetica-Bold').text('COMPREHENSIVE AUDIT REPORT', { align: 'center' });
+      doc.moveDown(2);
+      
+      doc.fontSize(20).font('Helvetica').text(audit.auditName, { align: 'center' });
       doc.moveDown();
       
-      doc.fontSize(14).text(`Audit Name: ${audit.auditName}`);
-      doc.text(`Status: ${audit.status}`);
+      doc.fontSize(14).font('Helvetica').text(`Audit ID: ${audit.id}`, { align: 'center' });
+      doc.fontSize(14).text(`Status: ${audit.status}`, { align: 'center' });
+      doc.fontSize(14).text(`Risk Level: ${audit.riskLevel || 'Not specified'}`, { align: 'center' });
+      doc.moveDown(2);
+      
+      doc.fontSize(12).text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'center' });
+      doc.fontSize(12).text(`Generated by: ${audit.assignedManager?.name || 'Not assigned'}`, { align: 'center' });
+      
+      doc.addPage();
+
+      // Table of Contents
+      addSectionHeader('TABLE OF CONTENTS');
+      
+      const tocItems = [
+        'Executive Summary',
+        'Audit Overview',
+        'Methodology',
+        'Risk Analysis',
+        'Control Mapping & Compliance',
+        'Audit Programs & Findings',
+        'Action Plans & Recommendations',
+        'Appendices'
+      ];
+
+      doc.fontSize(12).font('Helvetica');
+      tocItems.forEach((item, index) => {
+        doc.text(`${index + 1}. ${item}`, { indent: 20 });
+        doc.moveDown(0.3);
+      });
+      
+      doc.addPage();
+
+      // Executive Summary
+      addSectionHeader('1. EXECUTIVE SUMMARY');
+      
+      checkPageBreak(100);
+      doc.fontSize(12).font('Helvetica');
+      const executiveSummary = `This comprehensive audit report presents the findings and results of the audit conducted for "${audit.auditName}". The audit assessed the effectiveness of internal controls, compliance with regulatory requirements, and alignment with organizational objectives.`;
+      
+      doc.text(executiveSummary, { align: 'justify' });
+      doc.moveDown();
+      
+      // Key Findings Summary
+      addSubsectionHeader('Key Findings Summary');
+      const totalFindings = audit.auditPrograms?.reduce((sum, program) => sum + (program.findings?.length || 0), 0) || 0;
+      const criticalFindings = audit.auditPrograms?.reduce((sum, program) => 
+        sum + (program.findings?.filter(f => f.severity === 'Critical').length || 0), 0) || 0;
+      
+      doc.fontSize(12).text(`• Total Findings: ${totalFindings}`);
+      doc.text(`• Critical Findings: ${criticalFindings}`);
+      doc.text(`• Audit Programs Reviewed: ${audit.auditPrograms?.length || 0}`);
+      doc.text(`• Risks Identified: ${audit.risks?.length || 0}`);
+      doc.text(`• Overall Risk Level: ${audit.riskLevel || 'Not assessed'}`);
+      doc.moveDown();
+
+      // Audit Overview
+      addSectionHeader('2. AUDIT OVERVIEW');
+      
+      addSubsectionHeader('Audit Details');
+      doc.fontSize(12).font('Helvetica');
+      doc.text(`Audit Name: ${audit.auditName}`);
+      doc.text(`Audit Status: ${audit.status}`);
       doc.text(`Risk Level: ${audit.riskLevel || 'Not specified'}`);
-      doc.fontSize(14).text(`Manager: ${audit.assignedManager?.name || 'Not assigned'}`);
-      doc.text(`Generated: ${new Date().toLocaleDateString()}`);
+      doc.text(`Audit Manager: ${audit.assignedManager?.name || 'Not assigned'}`);
+      doc.text(`Manager Email: ${audit.assignedManager?.email || 'Not available'}`);
+      doc.text(`Created Date: ${audit.createdAt ? new Date(audit.createdAt).toLocaleDateString() : 'Not specified'}`);
+      doc.text(`Last Updated: ${audit.updatedAt ? new Date(audit.updatedAt).toLocaleDateString() : 'Not specified'}`);
       doc.moveDown();
 
-      doc.fontSize(16).text('Executive Summary', { underline: true });
-      doc.moveDown();
-      doc.fontSize(12).text('Audit objectives and scope information would be displayed here.');
-      doc.moveDown();
-
-      doc.fontSize(16).text('Audit Programs', { underline: true });
-      doc.moveDown();
+      // Methodology
+      addSectionHeader('3. METHODOLOGY');
       
-      if (audit.auditPrograms && audit.auditPrograms.length > 0) {
-        audit.auditPrograms.forEach((program: any, index: number) => {
-          doc.fontSize(12).text(`${index + 1}. ${program.procedureName || `Program ${index + 1}`}`);
-          if (program.expectedOutcome) {
-            doc.text(`   Expected Outcome: ${program.expectedOutcome}`);
+      addSubsectionHeader('Audit Approach');
+      doc.fontSize(12).font('Helvetica');
+      const methodology = `The audit was conducted using a systematic approach that included risk assessment, control testing, and compliance verification. The methodology involved reviewing documentation, conducting interviews, performing tests of controls, and analyzing data to ensure comprehensive coverage of all relevant areas.`;
+      
+      doc.text(methodology, { align: 'justify' });
+      doc.moveDown();
+
+      addSubsectionHeader('Scope and Criteria');
+      doc.fontSize(12).text('Scope: Full organizational audit coverage');
+      doc.text('Criteria: Industry standards, regulatory requirements, and internal policies');
+      doc.text('Period: Current fiscal year audit period');
+      doc.moveDown();
+
+      // Risk Analysis
+      addSectionHeader('4. RISK ANALYSIS');
+      
+      if (audit.risks && audit.risks.length > 0) {
+        audit.risks.forEach((risk: any, index: number) => {
+          checkPageBreak(120);
+          addSubsectionHeader(`Risk ${index + 1}: ${risk.title}`);
+          
+          doc.fontSize(12).font('Helvetica');
+          doc.text(`Category: ${risk.category || 'Not specified'}`);
+          doc.text(`Impact: ${risk.impact || 'Not assessed'}`);
+          doc.text(`Likelihood: ${risk.likelihood || 'Not assessed'}`);
+          
+          if (risk.description) {
+            doc.text(`Description: ${risk.description}`);
           }
-          if (program.findings && program.findings.length > 0) {
-            doc.text(`   Findings: ${program.findings.length} identified`);
+          
+          if (risk.inherentScore !== null) {
+            doc.text(`Inherent Risk Score: ${risk.inherentScore}/10`);
           }
-          doc.moveDown(0.5);
+          
+          if (risk.residualScore !== null) {
+            doc.text(`Residual Risk Score: ${risk.residualScore}/10`);
+          }
+          
+          if (risk.mitigationStrategy) {
+            doc.text(`Mitigation Strategy: ${risk.mitigationStrategy}`);
+          }
+          
+          doc.moveDown();
         });
       } else {
-        doc.fontSize(12).text('No audit programs found.');
+        doc.fontSize(12).text('No specific risks were identified for this audit.');
+        doc.moveDown();
+      }
+
+      // Control Mapping & Compliance
+      addSectionHeader('5. CONTROL MAPPING & COMPLIANCE');
+      
+      let hasControlMappings = false;
+      if (audit.auditPrograms && audit.auditPrograms.length > 0) {
+        audit.auditPrograms.forEach((program: any, programIndex: number) => {
+          if (program.controlMappings && program.controlMappings.length > 0) {
+            hasControlMappings = true;
+            checkPageBreak(100);
+            addSubsectionHeader(`Program ${programIndex + 1}: ${program.procedureName || 'Untitled Program'}`);
+            
+            program.controlMappings.forEach((mapping: any, mappingIndex: number) => {
+              doc.fontSize(12).font('Helvetica');
+              doc.text(`${mappingIndex + 1}. Framework: ${mapping.framework?.name || 'Unknown Framework'}`);
+              doc.text(`   Coverage Status: ${mapping.coverageStatus || 'Not assessed'}`);
+              doc.text(`   Control Reference: ${mapping.controlReference || 'Not specified'}`);
+              doc.moveDown(0.3);
+            });
+            doc.moveDown();
+          }
+        });
+      }
+      
+      if (!hasControlMappings) {
+        doc.fontSize(12).text('No control mappings have been defined for this audit. Consider establishing control frameworks to improve compliance monitoring.');
+        doc.moveDown();
+      }
+
+      // Audit Programs & Findings
+      addSectionHeader('6. AUDIT PROGRAMS & FINDINGS');
+      
+      if (audit.auditPrograms && audit.auditPrograms.length > 0) {
+        audit.auditPrograms.forEach((program: any, programIndex: number) => {
+          checkPageBreak(150);
+          addSubsectionHeader(`Program ${programIndex + 1}: ${program.procedureName || `Audit Program ${programIndex + 1}`}`);
+          
+          doc.fontSize(12).font('Helvetica');
+          
+          if (program.expectedOutcome) {
+            doc.text(`Expected Outcome: ${program.expectedOutcome}`);
+          }
+          
+          if (program.actualResult) {
+            doc.text(`Actual Result: ${program.actualResult}`);
+          }
+          
+          if (program.controlReference) {
+            doc.text(`Control Reference: ${program.controlReference}`);
+          }
+          
+          if (program.procedureDescription) {
+            doc.text(`Procedure Description: ${program.procedureDescription}`);
+          }
+          
+          doc.moveDown(0.5);
+          
+          // Findings
+          if (program.findings && program.findings.length > 0) {
+            addSubsectionHeader(`Findings for ${program.procedureName}`);
+            
+            program.findings.forEach((finding: any, findingIndex: number) => {
+              checkPageBreak(120);
+              
+              // Severity-based formatting
+              const severityColor = finding.severity === 'Critical' ? 'red' : 
+                                 finding.severity === 'High' ? 'orange' : 
+                                 finding.severity === 'Medium' ? 'blue' : 'black';
+              
+              doc.fontSize(12).font('Helvetica-Bold');
+              doc.text(`Finding ${findingIndex + 1}: ${finding.description}`);
+              doc.font('Helvetica');
+              
+              doc.text(`Severity: ${finding.severity} (${finding.status})`);
+              doc.text(`Category: ${finding.category || 'Not specified'}`);
+              
+              if (finding.impact) {
+                doc.text(`Impact: ${finding.impact}`);
+              }
+              
+              if (finding.recommendation) {
+                doc.text(`Recommendation: ${finding.recommendation}`);
+              }
+              
+              doc.moveDown(0.5);
+              
+              // Action Plans
+              if (finding.actionPlans && finding.actionPlans.length > 0) {
+                addSubsectionHeader(`Action Plans for Finding ${findingIndex + 1}`);
+                
+                finding.actionPlans.forEach((actionPlan: any, planIndex: number) => {
+                  doc.fontSize(11).font('Helvetica');
+                  doc.text(`${planIndex + 1}. ${actionPlan.description}`);
+                  doc.text(`   Owner: ${actionPlan.owner?.name || 'Unassigned'}`);
+                  doc.text(`   Due Date: ${actionPlan.dueDate ? new Date(actionPlan.dueDate).toLocaleDateString() : 'Not set'}`);
+                  doc.text(`   Status: ${actionPlan.status || 'Pending'}`);
+                  doc.text(`   Priority: ${actionPlan.priority || 'Medium'}`);
+                  doc.moveDown(0.3);
+                });
+                doc.moveDown();
+              }
+            });
+          } else {
+            doc.fontSize(12).text('No findings identified for this program.');
+            doc.moveDown();
+          }
+        });
+      } else {
+        doc.fontSize(12).text('No audit programs were defined for this audit.');
+        doc.moveDown();
+      }
+
+      // Action Plans & Recommendations
+      addSectionHeader('7. ACTION PLANS & RECOMMENDATIONS');
+      
+      // Collect all action plans
+      const allActionPlans: any[] = [];
+      audit.auditPrograms?.forEach((program: any) => {
+        program.findings?.forEach((finding: any) => {
+          if (finding.actionPlans && finding.actionPlans.length > 0) {
+            finding.actionPlans.forEach((actionPlan: any) => {
+              allActionPlans.push({
+                ...actionPlan,
+                programName: program.procedureName,
+                findingDescription: finding.description
+              });
+            });
+          }
+        });
+      });
+      
+      if (allActionPlans.length > 0) {
+        // Sort by priority and due date
+        allActionPlans.sort((a, b) => {
+          const priorityOrder = { 'Critical': 0, 'High': 1, 'Medium': 2, 'Low': 3 };
+          const aPriority = priorityOrder[a.priority] || 3;
+          const bPriority = priorityOrder[b.priority] || 3;
+          return aPriority - bPriority;
+        });
+        
+        allActionPlans.forEach((actionPlan, index) => {
+          checkPageBreak(80);
+          doc.fontSize(12).font('Helvetica-Bold');
+          doc.text(`${index + 1}. ${actionPlan.description}`);
+          doc.font('Helvetica');
+          
+          doc.text(`   Program: ${actionPlan.programName}`);
+          doc.text(`   Finding: ${actionPlan.findingDescription}`);
+          doc.text(`   Owner: ${actionPlan.owner?.name || 'Unassigned'}`);
+          doc.text(`   Due Date: ${actionPlan.dueDate ? new Date(actionPlan.dueDate).toLocaleDateString() : 'Not set'}`);
+          doc.text(`   Status: ${actionPlan.status || 'Pending'}`);
+          doc.text(`   Priority: ${actionPlan.priority || 'Medium'}`);
+          doc.moveDown();
+        });
+      } else {
+        doc.fontSize(12).text('No action plans have been established. Consider developing action plans for identified findings to ensure proper remediation.');
+        doc.moveDown();
+      }
+
+      // Appendices
+      addSectionHeader('8. APPENDICES');
+      
+      addSubsectionHeader('Audit Team');
+      doc.fontSize(12).font('Helvetica');
+      doc.text(`Audit Manager: ${audit.assignedManager?.name || 'Not assigned'}`);
+      doc.text(`Contact: ${audit.assignedManager?.email || 'Not available'}`);
+      doc.moveDown();
+      
+      addSubsectionHeader('Glossary');
+      doc.fontSize(11).font('Helvetica');
+      doc.text('Critical Risk: Requires immediate attention and remediation');
+      doc.text('High Risk: Significant impact requiring prompt action');
+      doc.text('Medium Risk: Moderate impact requiring attention');
+      doc.text('Low Risk: Minimal impact requiring monitoring');
+      doc.moveDown();
+      
+      // Footer on all pages
+      const range = doc.bufferedPageRange();
+      for (let i = range.start; i <= range.start + range.count; i++) {
+        doc.switchToPage(i);
+        
+        // Add footer
+        doc.fontSize(10).font('Helvetica');
+        const footerText = `Page ${i + 1} of ${range.start + range.count} | Audit Report - ${audit.auditName} | Confidential`;
+        doc.text(footerText, 50, height - 30, { align: 'center' });
+        
+        // Add header line
+        doc.moveTo(50, height - 40).lineTo(doc.page.width - 50, height - 40).lineWidth(0.5).stroke();
       }
 
     } catch (error) {
-      doc.fontSize(12).text('Error generating PDF content');
-      console.error('PDF generation error:', error);
+      doc.fontSize(12).font('Helvetica').text('Error generating comprehensive PDF content');
+      console.error('Comprehensive PDF generation error:', error);
     }
   }
 
@@ -772,7 +1187,7 @@ export class ReportsService {
     const auditReports = await this.prisma.report.findMany({
       where: {
         audit: {
-          status: { in: ['Finalized', 'Closed'] }
+          status: { in: ['Finalized', 'Closed', 'Report Generated'] }
         }
       },
       include: {
@@ -1918,6 +2333,25 @@ export class ReportsService {
       where: { id: auditId },
       include: {
         assignedManager: true,
+        auditPrograms: {
+          include: {
+            findings: {
+              include: {
+                actionPlans: {
+                  include: {
+                    owner: true
+                  }
+                }
+              }
+            },
+            controlMappings: {
+              include: {
+                framework: true
+              }
+            }
+          }
+        },
+        risks: true
       }
     });
 
@@ -1925,11 +2359,26 @@ export class ReportsService {
       throw new NotFoundException(`Audit with ID ${auditId} not found`);
     }
 
-    // Check if report file exists
-    const filePath = path.join(__dirname, '..', '..', 'uploads', 'reports', `Audit_Report_${auditId}.pdf`);
-    if (!fs.existsSync(filePath)) {
-      throw new NotFoundException('Report file not found. Please ensure the audit has been finalized.');
+    // Only allow report generation for closed audits
+    if (audit.status !== 'Closed') {
+      throw new BadRequestException('Report can only be generated for audits that have been closed by the Chief Auditor');
     }
+
+    // Generate the enhanced PDF with risk analysis and control mapping
+    const pdfBuffer = await this.generatePDFBuffer(auditId);
+    
+    // Save the report file
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `${audit.auditName.replace(/[^a-z0-9]/gi, '_')}_Report_${timestamp}.pdf`;
+    const filePath = path.join(process.cwd(), 'uploads', 'reports', fileName);
+    
+    // Ensure reports directory exists
+    const reportsDir = path.join(process.cwd(), 'uploads', 'reports');
+    if (!fs.existsSync(reportsDir)) {
+      fs.mkdirSync(reportsDir, { recursive: true });
+    }
+    
+    fs.writeFileSync(filePath, pdfBuffer);
 
     // Check if report already exists for this audit
     const existingReport = await this.prisma.report.findFirst({
@@ -1944,7 +2393,7 @@ export class ReportsService {
         data: {
           generatedBy: user.id || user.sub,
           generatedAt: new Date(),
-          fileUrl: `/uploads/reports/Audit_Report_${auditId}.pdf`,
+          fileUrl: `/uploads/reports/${fileName}`,
           fileType: 'pdf',
         }
       });
@@ -1955,43 +2404,55 @@ export class ReportsService {
           auditId,
           title: `Audit Report - ${audit.auditName}`,
           generatedBy: user.id || user.sub,
-          fileUrl: `/uploads/reports/Audit_Report_${auditId}.pdf`,
+          fileUrl: `/uploads/reports/${fileName}`,
           fileType: 'pdf',
         }
       });
     }
 
-    // Report generation no longer changes audit status - audit remains Finalized for Chief Auditor review
-
-    // Notify all Chief Auditors to preview and approve the report
-    const chiefAuditors = await this.prisma.user.findMany({
-      where: {
-        userRoles: {
-          some: {
-            role: {
-              roleName: { in: ['Chief Auditor'] }
-            }
-          }
-        }
-      }
+    // Update audit status to Report Generated
+    await this.prisma.audit.update({
+      where: { id: auditId },
+      data: { status: 'Report Generated' }
     });
 
-    for (const chiefAuditor of chiefAuditors) {
-      if (this.notificationService) {
+    // Notify all stakeholders that report has been generated
+    const recipients = {
+      managerId: audit.assignedManagerId,
+      auditorIds: [] // AuditProgram doesn't have assignedAuditorId field
+    };
+
+    if (this.notificationService) {
+      // Notify manager
+      if (recipients.managerId) {
         await this.notificationService.create({
-          userId: chiefAuditor.id,
-          title: 'Audit Report Pending Approval',
-          message: `The audit report for '${audit.auditName}' has been saved by ${user.name || 'a Manager'} and is awaiting your approval.`,
-          type: 'action_required',
+          userId: recipients.managerId,
+          title: 'Audit Report Generated',
+          message: `The final audit report for '${audit.auditName}' has been generated by the Chief Auditor and is now available.`,
+          type: 'success',
           link: `/reports/audit/${auditId}/preview`,
         });
+      }
+
+      // Notify auditors
+      if (recipients.auditorIds.length > 0) {
+        for (const auditorId of recipients.auditorIds) {
+          await this.notificationService.create({
+            userId: auditorId,
+            title: 'Audit Report Generated',
+            message: `The final audit report for '${audit.auditName}' has been generated and is now available for review.`,
+            type: 'info',
+            link: `/reports/audit/${auditId}/preview`,
+          });
+        }
       }
     }
 
     return {
       success: true,
-      message: 'Report saved successfully. Chief Auditor has been notified for approval.',
-      report
+      message: 'Report generated and saved successfully with risk analysis and control mapping.',
+      report,
+      filePath: `/uploads/reports/${fileName}`
     };
   }
 
@@ -2098,11 +2559,11 @@ export class ReportsService {
         console.log('Body:', emailBody);
         console.log('Attachment:', reportFileName + ' (' + pdfBuffer.length + ' bytes)');
         console.log('Shared by:', user?.name || user?.email || 'Chief Auditor');
-        console.log('================================================');
+        console.log('============================================================');
       }
 
       // Create notification if notification service exists
-      if (this.notificationService && user?.id) {
+      if (this.notificationService) {
         await this.notificationService.create({
           userId: user.id || user.sub,
           title: 'Audit Report Shared Successfully',
@@ -2115,11 +2576,10 @@ export class ReportsService {
         success: true,
         message: `Audit report successfully shared with ${email}`,
         details: {
-          auditName: audit.auditName,
+          reportTitle: audit.auditName,
           recipientEmail: email,
           sharedAt: new Date(),
-          sharedBy: user?.name || user?.email || 'Chief Auditor',
-          reportSource: audit.reports && audit.reports.length > 0 ? 'Stored Report' : 'Generated PDF'
+          sharedBy: user?.name || user?.email || 'Chief Auditor'
         }
       };
     } catch (error) {
@@ -2127,5 +2587,157 @@ export class ReportsService {
       throw new InternalServerErrorException('Failed to share audit report');
     }
   }
-}
 
+  /**
+   * Generate enhanced report with risk analysis and control mapping
+   */
+  async generateEnhancedReport(auditId: number, user: any) {
+    const audit = await this.prisma.audit.findUnique({
+      where: { id: auditId },
+      include: {
+        assignedManager: true,
+        risks: true,
+        auditPrograms: {
+          include: {
+            controlMappings: {
+              include: {
+                framework: true
+              }
+            },
+            findings: {
+              include: {
+                actionPlans: {
+                  include: {
+                    owner: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!audit) {
+      throw new NotFoundException(`Audit with ID ${auditId} not found`);
+    }
+
+    if (audit.status !== 'Closed') {
+      throw new BadRequestException('Enhanced report can only be generated for closed audits');
+    }
+
+    // Generate enhanced PDF with all sections
+    const pdfBuffer = await this.generatePDFBuffer(auditId);
+    
+    return {
+      success: true,
+      message: 'Enhanced report generated successfully with risk analysis and control mapping',
+      auditName: audit.auditName,
+      riskCount: audit.risks?.length || 0,
+      controlMappingCount: audit.auditPrograms?.reduce((acc, program) => acc + (program.controlMappings?.length || 0), 0) || 0,
+      findingCount: audit.auditPrograms?.reduce((acc, program) => acc + (program.findings?.length || 0), 0) || 0,
+      pdfSize: pdfBuffer.length
+    };
+  }
+
+  /**
+   * Finalize report and update audit status
+   */
+  async finalizeReport(auditId: number, user: any) {
+    const audit = await this.prisma.audit.findUnique({
+      where: { id: auditId },
+      include: {
+        reports: true
+      }
+    });
+
+    if (!audit) {
+      throw new NotFoundException(`Audit with ID ${auditId} not found`);
+    }
+
+    if (audit.status !== 'Closed') {
+      throw new BadRequestException('Report can only be finalized for closed audits');
+    }
+
+    // Check if a report exists
+    const existingReport = audit.reports?.find(r => r.fileUrl && r.fileUrl !== '');
+    if (!existingReport) {
+      throw new BadRequestException('No report found. Please generate a report first.');
+    }
+
+    // Update audit status to Report Generated
+    await this.prisma.audit.update({
+      where: { id: auditId },
+      data: { status: 'Report Generated' }
+    });
+
+    // Notify stakeholders
+    if (this.notificationService) {
+      // Notify manager
+      if (audit.assignedManagerId) {
+        await this.notificationService.create({
+          userId: audit.assignedManagerId,
+          title: 'Audit Report Finalized',
+          message: `The audit report for '${audit.auditName}' has been finalized by the Chief Auditor.`,
+          type: 'success',
+          link: `/reports/audit/${auditId}/preview`,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Audit report has been finalized successfully',
+      auditStatus: 'Report Generated',
+      finalizedAt: new Date()
+    };
+  }
+
+  /**
+   * Get report status and metadata
+   */
+  async getReportStatus(auditId: number) {
+    const audit = await this.prisma.audit.findUnique({
+      where: { id: auditId },
+      include: {
+        reports: {
+          orderBy: { generatedAt: 'desc' },
+          take: 1
+        },
+        risks: true,
+        auditPrograms: {
+          include: {
+            controlMappings: true,
+            findings: true
+          }
+        }
+      }
+    });
+
+    if (!audit) {
+      throw new NotFoundException(`Audit with ID ${auditId} not found`);
+    }
+
+    const latestReport = audit.reports?.[0];
+    const riskCount = audit.risks?.length || 0;
+    const controlMappingCount = audit.auditPrograms?.reduce((acc, program) => acc + (program.controlMappings?.length || 0), 0) || 0;
+    const findingCount = audit.auditPrograms?.reduce((acc, program) => acc + (program.findings?.length || 0), 0) || 0;
+
+    return {
+      auditId,
+      auditName: audit.auditName,
+      currentStatus: audit.status,
+      reportAvailable: !!latestReport,
+      reportGeneratedAt: latestReport?.generatedAt,
+      reportFileUrl: latestReport?.fileUrl,
+      canGenerateReport: audit.status === 'Closed',
+      canFinalizeReport: audit.status === 'Closed' && !!latestReport,
+      statistics: {
+        riskCount,
+        controlMappingCount,
+        findingCount,
+        programCount: audit.auditPrograms?.length || 0
+      }
+    };
+  }
+}

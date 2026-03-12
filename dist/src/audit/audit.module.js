@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const audit_service_1 = require("./audit.service");
 const audit_controller_1 = require("./audit.controller");
 const audit_workflow_controller_1 = require("./audit-workflow.controller");
+const risk_assessment_controller_1 = require("./risk-assessment.controller");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const audit_workflow_1 = require("../workflow/audit.workflow");
 const audit_timeline_service_1 = require("./audit-timeline.service");
@@ -28,7 +29,7 @@ exports.AuditModule = AuditModule;
 exports.AuditModule = AuditModule = __decorate([
     (0, common_1.Module)({
         imports: [notification_module_1.NotificationModule, reports_module_1.ReportsModule],
-        controllers: [audit_controller_1.AuditController, audit_workflow_controller_1.AuditWorkflowController, timesheet_controller_1.TimesheetController],
+        controllers: [audit_controller_1.AuditController, audit_workflow_controller_1.AuditWorkflowController, timesheet_controller_1.TimesheetController, risk_assessment_controller_1.RiskAssessmentController],
         providers: [
             audit_service_1.AuditService,
             prisma_service_1.PrismaService,

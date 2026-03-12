@@ -6,7 +6,8 @@ export declare enum AuditStatus {
     IN_PROGRESS = "In Progress",
     UNDER_REVIEW = "Under Review",
     FINALIZED = "Finalized",
-    CLOSED = "Closed"
+    CLOSED = "Closed",
+    REPORT_GENERATED = "Report Generated"
 }
 export declare const CAE_COMMENT_REQUIRED_TRANSITIONS: {
     from: string;

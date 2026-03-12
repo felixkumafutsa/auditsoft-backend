@@ -110,7 +110,7 @@ export class ReportsController {
   }
 
   @Post('audit/:id/save')
-  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager')
+  @Roles('System Administrator', 'Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)')
   async saveAuditReport(@Param('id') id: string, @Request() req) {
     return this.reportsService.saveReport(+id, req.user);
   }
@@ -131,5 +131,24 @@ export class ReportsController {
   @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager', 'Auditor')
   async downloadAuditReportWord(@Param('id') id: string, @Res() res: express.Response) {
     return this.reportsService.generateWord(+id, res);
+  }
+
+  // New endpoints for Chief Auditor report management
+  @Post('audit/:id/generate-enhanced')
+  @Roles('System Administrator', 'Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)')
+  async generateEnhancedReport(@Param('id') id: string, @Request() req) {
+    return this.reportsService.generateEnhancedReport(+id, req.user);
+  }
+
+  @Post('audit/:id/finalize-report')
+  @Roles('System Administrator', 'Chief Auditor', 'CAE', 'Chief Audit Executive', 'Chief Audit Executive (CAE)')
+  async finalizeReport(@Param('id') id: string, @Request() req) {
+    return this.reportsService.finalizeReport(+id, req.user);
+  }
+
+  @Get('audit/:id/report-status')
+  @Roles('System Administrator', 'Chief Auditor', 'Manager', 'Audit Manager')
+  async getReportStatus(@Param('id') id: string) {
+    return this.reportsService.getReportStatus(+id);
   }
 }
