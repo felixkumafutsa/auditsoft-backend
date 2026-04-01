@@ -7,8 +7,8 @@ export declare class AuditController {
     private workflowService;
     constructor(auditService: AuditService, workflowService: AuditWorkflowService);
     getAll(req: any): Promise<{
-        status: string;
         id: number;
+        status: string;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
@@ -32,8 +32,8 @@ export declare class AuditController {
     }[]>;
     exportExcel(req: any, res: Response): Promise<StreamableFile>;
     getLightweight(req: any): Promise<Partial<{
-        status: string;
         id: number;
+        status: string;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
@@ -56,8 +56,8 @@ export declare class AuditController {
         year: number | null;
     }>[]>;
     getTemplates(): Promise<{
-        status: string;
         id: number;
+        status: string;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
@@ -80,8 +80,8 @@ export declare class AuditController {
         year: number | null;
     }[]>;
     getOne(id: number, req: any): Promise<{
-        status: string;
         id: number;
+        status: string;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
@@ -104,8 +104,8 @@ export declare class AuditController {
         year: number | null;
     }>;
     create(body: CreateAuditDto): Promise<{
-        status: string;
         id: number;
+        status: string;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
@@ -128,8 +128,8 @@ export declare class AuditController {
         year: number | null;
     }>;
     update(id: number, body: UpdateAuditDto, req: any): Promise<{
-        status: string;
         id: number;
+        status: string;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
@@ -154,8 +154,8 @@ export declare class AuditController {
     assignAuditors(id: number, body: {
         auditorIds: number[];
     }): Promise<{
-        status: string;
         id: number;
+        status: string;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
@@ -178,8 +178,8 @@ export declare class AuditController {
         year: number | null;
     }>;
     delete(id: number): Promise<{
-        status: string;
         id: number;
+        status: string;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;
@@ -207,8 +207,8 @@ export declare class AuditController {
         toStatus: string;
         userRole?: string;
     }, req: any): Promise<{
-        status: string;
         id: number;
+        status: string;
         createdAt: Date;
         updatedAt: Date;
         assignedManagerId: number | null;

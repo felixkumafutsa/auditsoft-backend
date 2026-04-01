@@ -1172,13 +1172,58 @@ export class ReportsService {
       _count: { status: true },
     });
 
+    // Weekly Activity (Last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const recentAudits = await this.prisma.audit.findMany({
+      where: { createdAt: { gte: sevenDaysAgo } },
+      select: { createdAt: true, status: true }
+    });
+
+    const recentFindings = await this.prisma.finding.findMany({
+      where: { createdAt: { gte: sevenDaysAgo } },
+      select: { createdAt: true }
+    });
+
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const weeklyActivity: any[] = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dayName = days[date.getDay()];
+      const dayString = date.toISOString().split('T')[0];
+
+      const dayAudits = recentAudits.filter(a => a.createdAt.toISOString().split('T')[0] === dayString);
+      const dayFindings = recentFindings.filter(f => f.createdAt.toISOString().split('T')[0] === dayString);
+
+      const activity: any = {
+        name: dayName,
+        findings: dayFindings.length,
+        totalAudits: dayAudits.length,
+      };
+
+      // Count by status
+      dayAudits.forEach(audit => {
+        const status = audit.status || 'Planned';
+        // Normalize status names for frontend consistency if needed
+        const key = status.replace(/\s+/g, ''); 
+        activity[key] = (activity[key] || 0) + 1;
+      });
+
+      weeklyActivity.push(activity);
+    }
+
     return {
       totalAudits: audits,
       openFindings: findings,
       activeUsers: users,
       totalReports: reports,
       auditTrend: trendData,
-      auditStatusDistribution: auditStatus.map(s => ({ name: s.status, value: s._count.status }))
+      auditStatusDistribution: auditStatus.map(s => ({ name: s.status, value: s._count.status })),
+      weeklyActivity
     };
   }
 

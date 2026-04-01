@@ -36,7 +36,10 @@ async function clearDatabase() {
       // Audit programs and reports
       { name: 'AuditProgram', model: prisma.auditProgram },
       { name: 'Report', model: prisma.report },
+      { name: 'ReportFile', model: prisma.reportFile },
+      { name: 'CustomReport', model: prisma.customReport },
       { name: 'Timesheet', model: prisma.timesheet },
+      { name: 'RiskAssessment', model: prisma.riskAssessment },
       { name: 'Audit', model: prisma.audit },
       
       // Risk and KRI
